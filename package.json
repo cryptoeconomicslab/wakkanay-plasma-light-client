@@ -1,0 +1,59 @@
+{
+  "name": "wakkanay-plasma-aggregator",
+  "version": "0.0.1",
+  "description": "plasma aggregator implementation",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc --build ./tsconfig.json",
+    "build:check": "tsc --noEmit",
+    "build:dev": "tsc",
+    "test": "jest",
+    "lint": "eslint --ext ts,tsx src",
+    "lint:fix": "eslint --fix --ext ts,tsx src",
+    "clean": "rm -rf dist",
+    "prepare": "npm run build"
+  },
+  "keywords": [],
+  "author": {
+    "name": "Cryptoeconomics Lab",
+    "url": "https://www.cryptoeconomicslab.com/"
+  },
+  "engines": {
+    "node": ">=10"
+  },
+  "license": "ISC",
+  "devDependencies": {
+    "@types/jest": "^24.0.23",
+    "@typescript-eslint/eslint-plugin": "^2.8.0",
+    "@typescript-eslint/parser": "^2.8.0",
+    "eslint": "^6.7.0",
+    "eslint-config-prettier": "^6.7.0",
+    "eslint-plugin-prettier": "^3.1.1",
+    "jest": "^24.9.0",
+    "prettier": "^1.19.1",
+    "ts-jest": "^24.2.0",
+    "ts-node": "^8.5.2",
+    "typescript": "^3.7.2"
+  },
+  "dependencies": {
+    "tslib": "^1.10.0"
+  },
+  "jest": {
+    "transform": {
+      "^.+\\.tsx?$": "ts-jest"
+    },
+    "testMatch": [
+      "**/__tests__/**/?(*.)+(spec|test).(ts|js)",
+      "**/?(*.)+(spec|test).ts"
+    ],
+    "moduleFileExtensions": [
+      "js",
+      "ts"
+    ],
+    "globals": {
+      "ts-jest": {
+        "tsConfig": "tsconfig.json"
+      }
+    }
+  }
+}

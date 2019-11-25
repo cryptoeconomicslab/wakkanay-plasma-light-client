@@ -1,0 +1,14 @@
+.DS_Store
+.idea
+node_modules
+yarn-error.log
+lerna-debug.log
+coverage
+.db/*
+.plasmadb/*
+.env
+CHANGELOG.md
+.nyc_output
+coverage.json
+lcov.info
+dist
