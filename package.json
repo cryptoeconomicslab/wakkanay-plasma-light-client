@@ -1,7 +1,7 @@
 {
-  "name": "wakkanay-plasma-aggregator",
+  "name": "wakkanay-plasma-light-client",
   "version": "0.0.1",
-  "description": "plasma aggregator implementation",
+  "description": "plasma light client implementation",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc --build ./tsconfig.json",
