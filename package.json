@@ -36,7 +36,9 @@
     "typescript": "^3.7.2"
   },
   "dependencies": {
-    "tslib": "^1.10.0"
+    "tslib": "^1.10.0",
+    "wakkanay": "git+https://github.com/cryptoeconomicslab/wakkanay.git",
+    "wakkanay-ethereum": "git+https://github.com/cryptoeconomicslab/wakkanay-ethereum.git"
   },
   "jest": {
     "transform": {
