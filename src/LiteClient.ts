@@ -1,6 +1,6 @@
 import { db } from 'wakkanay'
 
-export default class LightClient {
+export default class LiteClient {
   private kvs: db.IndexedDbKeyValueStore
 
   constructor() {
@@ -8,7 +8,7 @@ export default class LightClient {
   }
 
   public init() {
-    console.log('Initialize light client')
+    console.log('Initialize lite client')
   }
 
   public get address(): string {

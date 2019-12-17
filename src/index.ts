@@ -1,4 +1,4 @@
-import LightClient from './LightClient'
+import LiteClient from './LiteClient'
 
 /**
  * how to use LightClient
@@ -11,4 +11,4 @@ import LightClient from './LightClient'
  * ```
  */
 
-export default LightClient
+export default LiteClient
