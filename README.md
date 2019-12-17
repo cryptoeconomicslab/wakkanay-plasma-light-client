@@ -1,1 +1,1 @@
-# Plasma Aggregator
+# Plasma Lite Client
