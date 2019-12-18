@@ -4,6 +4,7 @@
   "description": "plasma lite client implementation",
   "main": "dist/index.js",
   "scripts": {
+    "start": "node dist/start.js",
     "build": "tsc --build ./tsconfig.json",
     "build:check": "tsc --noEmit",
     "build:dev": "tsc",
@@ -24,6 +25,7 @@
   "license": "ISC",
   "devDependencies": {
     "@types/jest": "^24.0.23",
+    "@types/node": "^12.12.18",
     "@typescript-eslint/eslint-plugin": "^2.8.0",
     "@typescript-eslint/parser": "^2.8.0",
     "eslint": "^6.7.0",
@@ -36,9 +38,11 @@
     "typescript": "^3.7.2"
   },
   "dependencies": {
+    "dotenv": "^8.2.0",
+    "ethers": "^4.0.40",
     "tslib": "^1.10.0",
-    "wakkanay": "git+https://github.com/cryptoeconomicslab/wakkanay.git",
-    "wakkanay-ethereum": "git+https://github.com/cryptoeconomicslab/wakkanay-ethereum.git"
+    "wakkanay": "file:../wakkanay",
+    "wakkanay-ethereum": "file:../wakkanay-ethereum"
   },
   "jest": {
     "transform": {

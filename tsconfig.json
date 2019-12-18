@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "target": "es2017",
+    "target": "esnext",
     "module": "commonjs",
-    "lib": ["es2017", "dom"],
+    "lib": ["esnext", "dom"],
     "declaration": true,
     "sourceMap": true,
     "importHelpers": true,
