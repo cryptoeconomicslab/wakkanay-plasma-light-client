@@ -1,4 +1,3 @@
-import { db } from 'wakkanay'
 import { Address, Bytes, Integer } from 'wakkanay/dist/types'
 import { IWallet } from 'wakkanay/dist/wallet'
 import { FreeVariable } from 'wakkanay/dist/ovm'
@@ -7,19 +6,19 @@ import { IDepositContract, IERC20Contract } from 'wakkanay/dist/contract'
 import { config } from 'dotenv'
 import { Property } from 'wakkanay/dist/ovm'
 import Coder from 'wakkanay-ethereum/dist/coder'
+import { KeyValueStore, RangeDb } from 'wakkanay/dist/db'
+import { StateUpdate } from './types'
+import axios from 'axios'
+import { DecoderUtil } from 'wakkanay/dist/utils'
 config()
 
 const DEPOSIT_CONTRACT_ADDRESS = Address.from(
   process.env.DEPOSIT_CONTRACT_ADDRESS as string
 )
 const ETH_ADDRESS = Address.from(process.env.ETH_ADDRESS as string)
-const THERE_EXISTS_ADDRESS = Address.from(
-  process.env.THERE_EXISTS_ADDRESS ||
-    '0x0000000000000000000500000000000000000005'
-)
+const THERE_EXISTS_ADDRESS = Address.from(process.env.THERE_EXISTS_ADDRESS)
 const IS_VALID_SIGNATURE_ADDRESS = Address.from(
-  process.env.IS_VALID_SIGNATURE_ADDRESS ||
-    '0x0000000000000000000600000000000000000006'
+  process.env.IS_VALID_SIG_ADDRESS
 )
 
 // TODO: extract and use compiled property
@@ -53,6 +52,7 @@ export default class LiteClient {
 
   constructor(
     private wallet: IWallet,
+    private kvs: KeyValueStore,
     private depositContractFactory: (address: Address) => DepositContract,
     private tokenContractFactory: (address: Address) => IERC20Contract
   ) {
@@ -64,8 +64,39 @@ export default class LiteClient {
     this.tokenContracts.set(ETH_ADDRESS.data, tokenContractFactory(ETH_ADDRESS))
   }
 
-  public init() {
-    console.log('Initialize lite client')
+  public start() {
+    this.fetchState()
+  }
+
+  private async fetchState() {
+    const res = await axios.get(
+      `${process.env.AGGREGATOR_HOST}/sync_state?address=${this.address}`
+    )
+    const stateUpdates = res.data.map(
+      (s: string) =>
+        new StateUpdate(
+          DecoderUtil.decodeStructable(Property, Coder, Bytes.fromHexString(s))
+        )
+    )
+    this.syncState(stateUpdates)
+  }
+
+  // sync latest state
+  private async syncState(stateUpdates: StateUpdate[]) {
+    const stateDb = await this.kvs.bucket(Bytes.fromString('state'))
+    const promises = stateUpdates.map(async su => {
+      const kvs = await stateDb.bucket(
+        Bytes.fromHexString(su.depositContractAddress.data)
+      )
+      const db = new RangeDb(kvs)
+      const record = su.toRecord()
+      await db.put(
+        su.range.start.data,
+        su.range.end.data,
+        Coder.encode(record.toStruct())
+      )
+    })
+    await Promise.all(promises)
   }
 
   /**
@@ -116,25 +147,26 @@ export default class LiteClient {
   }
 
   public get address(): string {
-    return '0x0472ec0185ebb8202f3d4ddb0226998889663cf2'
+    return this.wallet.getAddress().data
   }
 
-  public get balance(): Array<{
-    tokenAddress: string
-    tokenName: string
-    amount: number
-  }> {
-    return [
-      {
-        tokenAddress: '0x0000000000000000000000000000000000000000',
-        tokenName: 'eth',
-        amount: 1.2
-      },
-      {
-        tokenAddress: '0x0000000000000000000000000000000000000001',
-        tokenName: 'dai',
-        amount: 204
+  public async getBalance(): Promise<
+    Array<{
+      tokenAddress: string
+      amount: number
+    }>
+  > {
+    const stateDb = await this.kvs.bucket(Bytes.fromString('state'))
+    const addrs = Array.from(this.depositContracts.keys())
+    const resultPromise = addrs.map(async addr => {
+      const kvs = await stateDb.bucket(Bytes.fromHexString(addr))
+      const db = new RangeDb(kvs)
+      const data = await db.get(0n, 10000n) // todo: fix get all
+      return {
+        tokenAddress: addr,
+        amount: data.reduce((p, c) => p + Number(c.end.data - c.start.data), 0)
       }
-    ]
+    })
+    return await Promise.all(resultPromise)
   }
 }

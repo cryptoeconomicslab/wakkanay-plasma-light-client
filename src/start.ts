@@ -26,18 +26,24 @@ async function instantiate() {
     return new ERC20Contract(address, wallet.getEthersWallet())
   }
 
-  return new LiteClient(wallet, depositContractFactory, tokenContractFactory)
+  return new LiteClient(
+    wallet,
+    kvs,
+    depositContractFactory,
+    tokenContractFactory
+  )
 }
 
 async function main() {
   const liteClient = await instantiate()
-
+  liteClient.start()
+  console.log(liteClient.address)
   liteClient.registerToken(
     Address.from(process.env.TOKEN_ADDRESS as string),
     Address.from(process.env.DEPOSIT_CONTRACT_ADDRESS as string)
   )
 
-  liteClient.deposit(10, Address.from(process.env.TOKEN_ADDRESS as string))
+  // liteClient.deposit(10, Address.from(process.env.TOKEN_ADDRESS as string))
 }
 
 main()
