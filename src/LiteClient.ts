@@ -64,6 +64,28 @@ export default class LiteClient {
     this.tokenContracts.set(ETH_ADDRESS.data, tokenContractFactory(ETH_ADDRESS))
   }
 
+  public get address(): string {
+    return this.wallet.getAddress().data
+  }
+
+  public async getBalance(): Promise<
+    Array<{
+      tokenAddress: string
+      amount: number
+    }>
+  > {
+    const addrs = Array.from(this.depositContracts.keys())
+    const resultPromise = addrs.map(async addr => {
+      const db = await this.getStateDb(Address.from(addr))
+      const data = await db.get(0n, 10000n) // todo: fix get all
+      return {
+        tokenAddress: addr,
+        amount: data.reduce((p, c) => p + Number(c.end.data - c.start.data), 0)
+      }
+    })
+    return await Promise.all(resultPromise)
+  }
+
   public start() {
     this.fetchState()
   }
@@ -126,6 +148,12 @@ export default class LiteClient {
     console.log('deposit', amount, tokenAddress)
   }
 
+  /**
+   * transfer token
+   * @param amount amount to transfer
+   * @param depositContractAddress which token to transfer
+   * @param to to whom transfer
+   */
   public async transfer(
     amount: number,
     depositContractAddress: Address,
@@ -152,6 +180,11 @@ export default class LiteClient {
     })
   }
 
+  /**
+   * search coin range
+   * @param amount search range with greater than this amount
+   * @param tokenAddress search this depositContractAddress
+   */
   private async searchRange(
     amount: number,
     tokenAddress: Address
@@ -173,6 +206,11 @@ export default class LiteClient {
     return this.tokenContracts.get(tokenAddress.data)
   }
 
+  /**
+   * register new ERC20 token
+   * @param tokenAddress ERC20 token address to register
+   * @param depositContractAddress deposit contract address connecting to tokenAddress above
+   */
   public registerToken(tokenAddress: Address, depositContractAddress: Address) {
     console.log('contracts set for token:', tokenAddress.data)
     const depositContract = this.depositContractFactory(depositContractAddress)
@@ -184,31 +222,17 @@ export default class LiteClient {
     )
   }
 
-  public get address(): string {
-    return this.wallet.getAddress().data
-  }
-
-  public async getBalance(): Promise<
-    Array<{
-      tokenAddress: string
-      amount: number
-    }>
-  > {
-    const addrs = Array.from(this.depositContracts.keys())
-    const resultPromise = addrs.map(async addr => {
-      const db = await this.getStateDb(Address.from(addr))
-      const data = await db.get(0n, 10000n) // todo: fix get all
-      return {
-        tokenAddress: addr,
-        amount: data.reduce((p, c) => p + Number(c.end.data - c.start.data), 0)
-      }
-    })
-    return await Promise.all(resultPromise)
-  }
-
   private async getStateDb(addr: Address): Promise<RangeDb> {
     const stateDb = await this.kvs.bucket(Bytes.fromString('state'))
     const bucket = await stateDb.bucket(Bytes.fromHexString(addr.data))
     return new RangeDb(bucket)
+  }
+
+  public async exit(amount: number, depositContractAddress: Address) {
+    // TODO: implement
+  }
+
+  public async finalizeExit(exitId: string) {
+    // TODO: implement
   }
 }
