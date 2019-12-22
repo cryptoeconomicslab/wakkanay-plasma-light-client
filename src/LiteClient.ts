@@ -1,4 +1,4 @@
-import { Address, Bytes, Integer } from 'wakkanay/dist/types'
+import { Address, Bytes, Integer, Range, BigNumber } from 'wakkanay/dist/types'
 import { IWallet } from 'wakkanay/dist/wallet'
 import { FreeVariable } from 'wakkanay/dist/ovm'
 import { DepositContract } from 'wakkanay-ethereum/dist/contract'
@@ -7,7 +7,7 @@ import { config } from 'dotenv'
 import { Property } from 'wakkanay/dist/ovm'
 import Coder from 'wakkanay-ethereum/dist/coder'
 import { KeyValueStore, RangeDb } from 'wakkanay/dist/db'
-import { StateUpdate } from './types'
+import { StateUpdate, Transaction } from 'wakkanay-ethereum-plasma'
 import axios from 'axios'
 import { DecoderUtil } from 'wakkanay/dist/utils'
 config()
@@ -22,7 +22,7 @@ const IS_VALID_SIGNATURE_ADDRESS = Address.from(
 )
 
 // TODO: extract and use compiled property
-function ownershipProperty(from: Address) {
+function ownershipProperty(owner: Address) {
   const hint = Bytes.fromString('tx,key')
   const sigHint = Bytes.fromString('sig,key')
   return new Property(THERE_EXISTS_ADDRESS, [
@@ -36,7 +36,7 @@ function ownershipProperty(from: Address) {
           new Property(IS_VALID_SIGNATURE_ADDRESS, [
             FreeVariable.from('tx'),
             FreeVariable.from('sig'),
-            Coder.encode(from),
+            Coder.encode(owner),
             Bytes.fromString('secp256k1')
           ]).toStruct()
         )
@@ -97,6 +97,7 @@ export default class LiteClient {
       )
     })
     await Promise.all(promises)
+    console.log(await this.getBalance())
   }
 
   /**
@@ -123,6 +124,43 @@ export default class LiteClient {
       ownershipProperty(myAddress)
     )
     console.log('deposit', amount, tokenAddress)
+  }
+
+  public async transfer(
+    amount: number,
+    depositContractAddress: Address,
+    to: Address
+  ) {
+    console.log('transfer :', amount, depositContractAddress, to)
+    const token = await this.searchRange(amount, depositContractAddress)
+    if (!token) {
+      throw new Error('Not enough amount')
+    }
+
+    const property = ownershipProperty(to)
+    const tx = new Transaction(
+      depositContractAddress,
+      new Range(
+        token.range.start,
+        BigNumber.from(token.range.start.data + BigInt(amount))
+      ),
+      property
+    )
+
+    await axios.post(`${process.env.AGGREGATOR_HOST}/send_tx`, {
+      tx: Coder.encode(tx.toStruct()).toHexString()
+    })
+  }
+
+  private async searchRange(
+    amount: number,
+    tokenAddress: Address
+  ): Promise<StateUpdate | undefined> {
+    const db = await this.getStateDb(tokenAddress)
+    const stateUpdates = await db.get(0n, 10000n)
+    return stateUpdates
+      .map(StateUpdate.fromRangeRecord)
+      .find(su => su.amount > BigInt(amount))
   }
 
   private getDepositContract(
@@ -156,11 +194,9 @@ export default class LiteClient {
       amount: number
     }>
   > {
-    const stateDb = await this.kvs.bucket(Bytes.fromString('state'))
     const addrs = Array.from(this.depositContracts.keys())
     const resultPromise = addrs.map(async addr => {
-      const kvs = await stateDb.bucket(Bytes.fromHexString(addr))
-      const db = new RangeDb(kvs)
+      const db = await this.getStateDb(Address.from(addr))
       const data = await db.get(0n, 10000n) // todo: fix get all
       return {
         tokenAddress: addr,
@@ -168,5 +204,11 @@ export default class LiteClient {
       }
     })
     return await Promise.all(resultPromise)
+  }
+
+  private async getStateDb(addr: Address): Promise<RangeDb> {
+    const stateDb = await this.kvs.bucket(Bytes.fromString('state'))
+    const bucket = await stateDb.bucket(Bytes.fromHexString(addr.data))
+    return new RangeDb(bucket)
   }
 }
