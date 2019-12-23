@@ -86,8 +86,8 @@ export default class LiteClient {
     return await Promise.all(resultPromise)
   }
 
-  public start() {
-    this.fetchState()
+  public async start() {
+    await this.fetchState()
   }
 
   private async fetchState() {
@@ -100,7 +100,7 @@ export default class LiteClient {
           DecoderUtil.decodeStructable(Property, Coder, Bytes.fromHexString(s))
         )
     )
-    this.syncState(stateUpdates)
+    await this.syncState(stateUpdates)
   }
 
   // sync latest state
@@ -175,8 +175,11 @@ export default class LiteClient {
       property
     )
 
+    const sig = await this.wallet.signMessage(Coder.encode(tx.body))
+    tx.signature = sig
+
     await axios.post(`${process.env.AGGREGATOR_HOST}/send_tx`, {
-      tx: Coder.encode(tx.toStruct()).toHexString()
+      data: Coder.encode(tx.toStruct()).toHexString()
     })
   }
 

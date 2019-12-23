@@ -42,8 +42,15 @@ async function main() {
     Address.from(process.env.TOKEN_ADDRESS as string),
     Address.from(process.env.DEPOSIT_CONTRACT_ADDRESS as string)
   )
+  await liteClient.start()
 
   // liteClient.deposit(10, Address.from(process.env.TOKEN_ADDRESS as string))
+  // liteClient.getBalance().then(console.log)
+  liteClient.transfer(
+    5,
+    Address.from(process.env.DEPOSIT_CONTRACT_ADDRESS as string),
+    Address.default()
+  )
 }
 
 main()
