@@ -7,7 +7,7 @@ import { config } from 'dotenv'
 import { Property } from 'wakkanay/dist/ovm'
 import Coder from 'wakkanay-ethereum/dist/coder'
 import { KeyValueStore, RangeDb } from 'wakkanay/dist/db'
-import { StateUpdate, Transaction } from 'wakkanay-ethereum-plasma'
+import { StateUpdate, Transaction, Block } from 'wakkanay-ethereum-plasma'
 import axios from 'axios'
 import { DecoderUtil } from 'wakkanay/dist/utils'
 config()
@@ -90,10 +90,17 @@ export default class LiteClient {
     return await Promise.all(resultPromise)
   }
 
+  /**
+   * start LiteClient process.
+   */
   public async start() {
     await this.fetchState()
   }
 
+  /**
+   * fetch latest state from aggregator
+   * update local database with new state updates.
+   */
   private async fetchState() {
     const res = await axios.get(
       `${process.env.AGGREGATOR_HOST}/sync_state?address=${this.address}`
@@ -107,7 +114,10 @@ export default class LiteClient {
     await this.syncState(stateUpdates)
   }
 
-  // sync latest state
+  /**
+   * sync given list of state updates to local database.
+   * @param stateUpdates list of state update to sync with local database
+   */
   private async syncState(stateUpdates: StateUpdate[]) {
     const stateDb = await this.kvs.bucket(Bytes.fromString('state'))
     const promises = stateUpdates.map(async su => {
@@ -126,7 +136,17 @@ export default class LiteClient {
   }
 
   /**
-   * Deposit to plasma
+   * Handle newly submitted block.
+   * client verifies all the state updates included within the block by executing state transition.
+   * if new state update is checkpoint property, client can discard past data.
+   * @param block new block submitted to commitment contract
+   */
+  private async handleNewBlock(block: Block) {
+    // TODO: implement
+  }
+
+  /**
+   * Deposit given amount of given ERC20Contract's token to corresponding deposit contract.
    * @param amount amount to deposit
    * @param erc20ContractAddress ERC20 token address, undefined for ETH
    */
@@ -154,7 +174,7 @@ export default class LiteClient {
   }
 
   /**
-   * transfer token
+   * transfer token to new owner. throw if given invalid inputs.
    * @param amount amount to transfer
    * @param depositContractAddress which token to transfer
    * @param to to whom transfer
@@ -183,9 +203,17 @@ export default class LiteClient {
     const sig = await this.wallet.signMessage(Coder.encode(tx.body))
     tx.signature = sig
 
-    await axios.post(`${process.env.AGGREGATOR_HOST}/send_tx`, {
+    const res = await axios.post(`${process.env.AGGREGATOR_HOST}/send_tx`, {
       data: Coder.encode(tx.toStruct()).toHexString()
     })
+
+    if (res.status === 201) {
+      console.log('successfully deposited to contract')
+    } else {
+      throw new Error(
+        `status: ${res.status}, transaction could not be accepted`
+      )
+    }
   }
 
   /**
@@ -204,12 +232,20 @@ export default class LiteClient {
       .find(su => su.amount > BigInt(amount))
   }
 
+  /**
+   * given ERC20 deposit contract address, returns corresponding deposit contract.
+   * @param erc20ContractAddress ERC20 contract address
+   */
   private getDepositContract(
     erc20ContractAddress: Address
   ): IDepositContract | undefined {
     return this.depositContracts.get(erc20ContractAddress.data)
   }
 
+  /**
+   * given ERC20 deposit contract address, returns ERC20 contract instance.
+   * @param erc20ContractAddress ERC20 contract address
+   */
   private getTokenContract(
     erc20ContractAddress: Address
   ): IERC20Contract | undefined {
@@ -235,6 +271,10 @@ export default class LiteClient {
     )
   }
 
+  /**
+   * get range db which stores state updates of given deposit contract address
+   * @param depositContractAddress Deposit contract address
+   */
   private async getStateDb(depositContractAddress: Address): Promise<RangeDb> {
     const stateDb = await this.kvs.bucket(Bytes.fromString('state'))
     const bucket = await stateDb.bucket(
