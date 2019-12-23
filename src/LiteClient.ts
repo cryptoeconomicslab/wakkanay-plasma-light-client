@@ -68,6 +68,10 @@ export default class LiteClient {
     return this.wallet.getAddress().data
   }
 
+  /**
+   * get balance method
+   * returns array of {tokenAddress: string, amount: number}
+   */
   public async getBalance(): Promise<
     Array<{
       tokenAddress: string
@@ -119,33 +123,34 @@ export default class LiteClient {
       )
     })
     await Promise.all(promises)
-    console.log(await this.getBalance())
   }
 
   /**
    * Deposit to plasma
    * @param amount amount to deposit
-   * @param tokenAddress ERC20 token address, undefined for ETH
+   * @param erc20ContractAddress ERC20 token address, undefined for ETH
    */
-  public async deposit(amount: number, tokenAddress?: Address) {
-    const depositContract = this.getDepositContract(tokenAddress || ETH_ADDRESS)
-    const tokenContract = this.getTokenContract(tokenAddress || ETH_ADDRESS)
+  public async deposit(amount: number, erc20ContractAddress?: Address) {
+    const depositContract = this.getDepositContract(
+      erc20ContractAddress || ETH_ADDRESS
+    )
+    const tokenContract = this.getTokenContract(
+      erc20ContractAddress || ETH_ADDRESS
+    )
 
-    console.log('deposit called')
-    console.log(tokenAddress)
-
-    console.log(depositContract, tokenContract)
+    console.log('deposit: ', depositContract, tokenContract)
     if (!depositContract || !tokenContract) {
       throw new Error('Contract not found.')
     }
 
     const myAddress = this.wallet.getAddress()
     await tokenContract.approve(depositContract.address, Integer.from(amount))
+
+    // TODO: how to handle result
     await depositContract.deposit(
       Integer.from(amount),
       ownershipProperty(myAddress)
     )
-    console.log('deposit', amount, tokenAddress)
   }
 
   /**
@@ -186,13 +191,13 @@ export default class LiteClient {
   /**
    * search coin range
    * @param amount search range with greater than this amount
-   * @param tokenAddress search this depositContractAddress
+   * @param depositContractAddress search this depositContractAddress
    */
   private async searchRange(
     amount: number,
-    tokenAddress: Address
+    depositContractAddress: Address
   ): Promise<StateUpdate | undefined> {
-    const db = await this.getStateDb(tokenAddress)
+    const db = await this.getStateDb(depositContractAddress)
     const stateUpdates = await db.get(0n, 10000n)
     return stateUpdates
       .map(StateUpdate.fromRangeRecord)
@@ -200,34 +205,41 @@ export default class LiteClient {
   }
 
   private getDepositContract(
-    tokenAddress: Address
+    erc20ContractAddress: Address
   ): IDepositContract | undefined {
-    return this.depositContracts.get(tokenAddress.data)
+    return this.depositContracts.get(erc20ContractAddress.data)
   }
 
-  private getTokenContract(tokenAddress: Address): IERC20Contract | undefined {
-    return this.tokenContracts.get(tokenAddress.data)
+  private getTokenContract(
+    erc20ContractAddress: Address
+  ): IERC20Contract | undefined {
+    return this.tokenContracts.get(erc20ContractAddress.data)
   }
 
   /**
    * register new ERC20 token
-   * @param tokenAddress ERC20 token address to register
+   * @param erc20ContractAddress ERC20 token address to register
    * @param depositContractAddress deposit contract address connecting to tokenAddress above
    */
-  public registerToken(tokenAddress: Address, depositContractAddress: Address) {
-    console.log('contracts set for token:', tokenAddress.data)
+  public registerToken(
+    erc20ContractAddress: Address,
+    depositContractAddress: Address
+  ) {
+    console.log('contracts set for token:', erc20ContractAddress.data)
     const depositContract = this.depositContractFactory(depositContractAddress)
     this.depositContracts.set(depositContractAddress.data, depositContract)
-    this.depositContracts.set(tokenAddress.data, depositContract)
+    this.depositContracts.set(erc20ContractAddress.data, depositContract)
     this.tokenContracts.set(
-      tokenAddress.data,
-      this.tokenContractFactory(tokenAddress)
+      erc20ContractAddress.data,
+      this.tokenContractFactory(erc20ContractAddress)
     )
   }
 
-  private async getStateDb(addr: Address): Promise<RangeDb> {
+  private async getStateDb(depositContractAddress: Address): Promise<RangeDb> {
     const stateDb = await this.kvs.bucket(Bytes.fromString('state'))
-    const bucket = await stateDb.bucket(Bytes.fromHexString(addr.data))
+    const bucket = await stateDb.bucket(
+      Bytes.fromHexString(depositContractAddress.data)
+    )
     return new RangeDb(bucket)
   }
 
