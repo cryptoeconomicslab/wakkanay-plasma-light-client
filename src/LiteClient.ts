@@ -197,7 +197,8 @@ export default class LiteClient {
         token.range.start,
         BigNumber.from(token.range.start.data + BigInt(amount))
       ),
-      property
+      property,
+      this.wallet.getAddress()
     )
 
     const sig = await this.wallet.signMessage(Coder.encode(tx.body))
