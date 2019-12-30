@@ -6,6 +6,7 @@ import LightClient from './LightClient'
 import { DepositContract, ERC20Contract } from 'wakkanay-ethereum/dist/contract'
 import { config } from 'dotenv'
 import StateManager from './managers/StateManager'
+import SyncManager from './managers/SyncManager'
 config()
 
 async function instantiate() {
@@ -30,12 +31,16 @@ async function instantiate() {
   const stateDb = await kvs.bucket(Bytes.fromString('state'))
   const stateManager = new StateManager(stateDb)
 
+  const syncDb = await kvs.bucket(Bytes.fromString('sync'))
+  const syncManager = new SyncManager(syncDb)
+
   return new LightClient(
     wallet,
     kvs,
     depositContractFactory,
     tokenContractFactory,
-    stateManager
+    stateManager,
+    syncManager
   )
 }
 

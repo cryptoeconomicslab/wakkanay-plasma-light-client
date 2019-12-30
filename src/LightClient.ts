@@ -11,6 +11,7 @@ import { StateUpdate, Transaction, Block } from 'wakkanay-ethereum-plasma'
 import axios from 'axios'
 import { DecoderUtil } from 'wakkanay/dist/utils'
 import StateManager from './managers/StateManager'
+import SyncManager from './managers/SyncManager'
 config()
 
 const DEPOSIT_CONTRACT_ADDRESS = Address.from(
@@ -49,13 +50,15 @@ function ownershipProperty(owner: Address) {
 export default class LightClient {
   private depositContracts: Map<string, IDepositContract> = new Map()
   private tokenContracts: Map<string, IERC20Contract> = new Map()
+  private _syncing = false
 
   constructor(
     private wallet: IWallet,
     private kvs: KeyValueStore,
     private depositContractFactory: (address: Address) => DepositContract,
     private tokenContractFactory: (address: Address) => IERC20Contract,
-    private stateManager: StateManager
+    private stateManager: StateManager,
+    private syncManager: SyncManager
   ) {
     // this.kvs = new db.IndexedDbKeyValueStore()
     this.depositContracts.set(
@@ -67,6 +70,10 @@ export default class LightClient {
 
   public get address(): string {
     return this.wallet.getAddress().data
+  }
+
+  public get syncing(): boolean {
+    return this.syncing
   }
 
   /**
@@ -100,34 +107,62 @@ export default class LightClient {
    * start LiteClient process.
    */
   public async start() {
-    await this.syncState()
+    // TODO: get latest block number submitted to commitment contract
+    const blockNumber = BigNumber.from(0)
+    await this.syncStateUntill(blockNumber)
+  }
+
+  /**
+   * sync local state to given block number
+   * @param blockNum block number to which client should sync
+   */
+  private async syncStateUntill(blockNum: BigNumber): Promise<void> {
+    let synced = await this.syncManager.getLatestSyncedBlockNumber()
+    if (synced.data > blockNum.data) {
+      throw new Error('Synced state is greater than latest block')
+    }
+
+    while (synced.data !== blockNum.data) {
+      synced = BigNumber.from(synced.data + 1n)
+      await this.syncState(synced)
+    }
   }
 
   /**
    * fetch latest state from aggregator
    * update local database with new state updates.
-   * TODO: add parameter block
+   * @param blockNumber block number to sync state
    */
-  private async syncState() {
-    // TODO: get state for not synced block.
-    const res = await axios.get(
-      `${process.env.AGGREGATOR_HOST}/sync_state?address=${this.address}`
-    )
-    const stateUpdates: StateUpdate[] = res.data.map(
-      (s: string) =>
-        new StateUpdate(
-          DecoderUtil.decodeStructable(Property, Coder, Bytes.fromHexString(s))
-        )
-    )
-    const promises = stateUpdates.map(async su => {
-      await this.stateManager.insertUnverifiedStateUpdate(
-        su.depositContractAddress,
-        su
+  private async syncState(blockNumber: BigNumber) {
+    this._syncing = true
+    try {
+      const res = await axios.get(
+        `${process.env.AGGREGATOR_HOST}/sync_state?address=${this.address}&blockNumber=${blockNumber.data}`
       )
-    })
-    await Promise.all(promises)
-
-    // TODO: fetch history proofs for unverified state udpate and verify them.
+      const stateUpdates: StateUpdate[] = res.data.map(
+        (s: string) =>
+          new StateUpdate(
+            DecoderUtil.decodeStructable(
+              Property,
+              Coder,
+              Bytes.fromHexString(s)
+            )
+          )
+      )
+      const promises = stateUpdates.map(async su => {
+        await this.stateManager.insertUnverifiedStateUpdate(
+          su.depositContractAddress,
+          su
+        )
+      })
+      await Promise.all(promises)
+      await this.syncManager.updateSyncedBlockNumber(blockNumber)
+      // TODO: fetch history proofs for unverified state udpate and verify them.
+    } catch (e) {
+      console.log(e)
+    } finally {
+      this._syncing = false
+    }
   }
 
   /**
