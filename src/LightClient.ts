@@ -45,7 +45,7 @@ function ownershipProperty(owner: Address) {
   ])
 }
 
-export default class LiteClient {
+export default class LightClient {
   // private kvs: db.IndexedDbKeyValueStore
   private depositContracts: Map<string, IDepositContract> = new Map()
   private tokenContracts: Map<string, IERC20Contract> = new Map()
