@@ -1,7 +1,7 @@
 {
-  "name": "wakkanay-plasma-lite-client",
+  "name": "wakkanay-plasma-light-client",
   "version": "0.0.1",
-  "description": "plasma lite client implementation",
+  "description": "plasma light client implementation",
   "main": "dist/index.js",
   "scripts": {
     "start": "node dist/start.js",
