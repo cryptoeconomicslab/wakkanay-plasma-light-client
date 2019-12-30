@@ -174,16 +174,6 @@ export default class LightClient {
   }
 
   /**
-   * Handle newly submitted block.
-   * client verifies all the state updates included within the block by executing state transition.
-   * if new state update is checkpoint property, client can discard past data.
-   * @param block new block submitted to commitment contract
-   */
-  private async handleNewBlock(block: Block) {
-    // TODO: implement
-  }
-
-  /**
    * Deposit given amount of given ERC20Contract's token to corresponding deposit contract.
    * @param amount amount to deposit
    * @param erc20ContractAddress ERC20 token address, undefined for ETH
