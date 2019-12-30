@@ -3,7 +3,11 @@ import { EthWallet } from 'wakkanay-ethereum/dist/wallet'
 import { Address, Bytes } from 'wakkanay/dist/types'
 import { InMemoryKeyValueStore } from 'wakkanay/dist/db'
 import LightClient from './LightClient'
-import { DepositContract, ERC20Contract } from 'wakkanay-ethereum/dist/contract'
+import {
+  DepositContract,
+  ERC20Contract,
+  CommitmentContract
+} from 'wakkanay-ethereum/dist/contract'
 import { config } from 'dotenv'
 import StateManager from './managers/StateManager'
 import SyncManager from './managers/SyncManager'
@@ -34,11 +38,18 @@ async function instantiate() {
   const syncDb = await kvs.bucket(Bytes.fromString('sync'))
   const syncManager = new SyncManager(syncDb)
 
+  const commitmentContract = new CommitmentContract(
+    Address.from(process.env.COMMITMENT_CONTRACT_ADDRESS),
+    eventDb,
+    wallet.getEthersWallet()
+  )
+
   return new LightClient(
     wallet,
     kvs,
     depositContractFactory,
     tokenContractFactory,
+    commitmentContract,
     stateManager,
     syncManager
   )

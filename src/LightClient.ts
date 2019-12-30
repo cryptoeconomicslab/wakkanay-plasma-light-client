@@ -2,7 +2,11 @@ import { Address, Bytes, Integer, Range, BigNumber } from 'wakkanay/dist/types'
 import { IWallet } from 'wakkanay/dist/wallet'
 import { FreeVariable } from 'wakkanay/dist/ovm'
 import { DepositContract } from 'wakkanay-ethereum/dist/contract'
-import { IDepositContract, IERC20Contract } from 'wakkanay/dist/contract'
+import {
+  IDepositContract,
+  IERC20Contract,
+  ICommitmentContract
+} from 'wakkanay/dist/contract'
 import { config } from 'dotenv'
 import { Property } from 'wakkanay/dist/ovm'
 import Coder from 'wakkanay-ethereum/dist/coder'
@@ -57,6 +61,7 @@ export default class LightClient {
     private kvs: KeyValueStore,
     private depositContractFactory: (address: Address) => DepositContract,
     private tokenContractFactory: (address: Address) => IERC20Contract,
+    private commitmentContract: ICommitmentContract,
     private stateManager: StateManager,
     private syncManager: SyncManager
   ) {
@@ -107,9 +112,12 @@ export default class LightClient {
    * start LiteClient process.
    */
   public async start() {
-    // TODO: get latest block number submitted to commitment contract
-    const blockNumber = BigNumber.from(0)
+    const blockNumber = await this.commitmentContract.getCurrentBlock()
     await this.syncStateUntill(blockNumber)
+    this.commitmentContract.subscribeBlockSubmitted((blockNumber, root) => {
+      console.log('new block submitted event:', root.toHexString())
+      this.syncState(blockNumber)
+    })
   }
 
   /**
