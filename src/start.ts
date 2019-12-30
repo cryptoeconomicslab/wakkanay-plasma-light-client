@@ -2,9 +2,10 @@ import * as ethers from 'ethers'
 import { EthWallet } from 'wakkanay-ethereum/dist/wallet'
 import { Address, Bytes } from 'wakkanay/dist/types'
 import { InMemoryKeyValueStore } from 'wakkanay/dist/db'
-import LiteClient from './LiteClient'
+import LightClient from './LightClient'
 import { DepositContract, ERC20Contract } from 'wakkanay-ethereum/dist/contract'
 import { config } from 'dotenv'
+import StateManager from './managers/StateManager'
 config()
 
 async function instantiate() {
@@ -26,11 +27,15 @@ async function instantiate() {
     return new ERC20Contract(address, wallet.getEthersWallet())
   }
 
-  return new LiteClient(
+  const stateDb = await kvs.bucket(Bytes.fromString('state'))
+  const stateManager = new StateManager(stateDb)
+
+  return new LightClient(
     wallet,
     kvs,
     depositContractFactory,
-    tokenContractFactory
+    tokenContractFactory,
+    stateManager
   )
 }
 

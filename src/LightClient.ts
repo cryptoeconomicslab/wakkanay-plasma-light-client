@@ -6,10 +6,11 @@ import { IDepositContract, IERC20Contract } from 'wakkanay/dist/contract'
 import { config } from 'dotenv'
 import { Property } from 'wakkanay/dist/ovm'
 import Coder from 'wakkanay-ethereum/dist/coder'
-import { KeyValueStore, RangeDb } from 'wakkanay/dist/db'
+import { KeyValueStore } from 'wakkanay/dist/db'
 import { StateUpdate, Transaction, Block } from 'wakkanay-ethereum-plasma'
 import axios from 'axios'
 import { DecoderUtil } from 'wakkanay/dist/utils'
+import StateManager from './managers/StateManager'
 config()
 
 const DEPOSIT_CONTRACT_ADDRESS = Address.from(
@@ -46,7 +47,6 @@ function ownershipProperty(owner: Address) {
 }
 
 export default class LightClient {
-  // private kvs: db.IndexedDbKeyValueStore
   private depositContracts: Map<string, IDepositContract> = new Map()
   private tokenContracts: Map<string, IERC20Contract> = new Map()
 
@@ -54,7 +54,8 @@ export default class LightClient {
     private wallet: IWallet,
     private kvs: KeyValueStore,
     private depositContractFactory: (address: Address) => DepositContract,
-    private tokenContractFactory: (address: Address) => IERC20Contract
+    private tokenContractFactory: (address: Address) => IERC20Contract,
+    private stateManager: StateManager
   ) {
     // this.kvs = new db.IndexedDbKeyValueStore()
     this.depositContracts.set(
@@ -80,11 +81,16 @@ export default class LightClient {
   > {
     const addrs = Array.from(this.depositContracts.keys())
     const resultPromise = addrs.map(async addr => {
-      const db = await this.getStateDb(Address.from(addr))
-      const data = await db.get(0n, 10000n) // todo: fix get all
+      const data = await this.stateManager.getVerifiedStateUpdates(
+        Address.from(addr),
+        new Range(BigNumber.from(0n), BigNumber.from(10000n))
+      )
       return {
         tokenAddress: addr,
-        amount: data.reduce((p, c) => p + Number(c.end.data - c.start.data), 0)
+        amount: data.reduce(
+          (p, s) => p + Number(s.range.end.data - s.range.start.data),
+          0
+        )
       }
     })
     return await Promise.all(resultPromise)
@@ -94,45 +100,34 @@ export default class LightClient {
    * start LiteClient process.
    */
   public async start() {
-    await this.fetchState()
+    await this.syncState()
   }
 
   /**
    * fetch latest state from aggregator
    * update local database with new state updates.
+   * TODO: add parameter block
    */
-  private async fetchState() {
+  private async syncState() {
+    // TODO: get state for not synced block.
     const res = await axios.get(
       `${process.env.AGGREGATOR_HOST}/sync_state?address=${this.address}`
     )
-    const stateUpdates = res.data.map(
+    const stateUpdates: StateUpdate[] = res.data.map(
       (s: string) =>
         new StateUpdate(
           DecoderUtil.decodeStructable(Property, Coder, Bytes.fromHexString(s))
         )
     )
-    await this.syncState(stateUpdates)
-  }
-
-  /**
-   * sync given list of state updates to local database.
-   * @param stateUpdates list of state update to sync with local database
-   */
-  private async syncState(stateUpdates: StateUpdate[]) {
-    const stateDb = await this.kvs.bucket(Bytes.fromString('state'))
     const promises = stateUpdates.map(async su => {
-      const kvs = await stateDb.bucket(
-        Bytes.fromHexString(su.depositContractAddress.data)
-      )
-      const db = new RangeDb(kvs)
-      const record = su.toRecord()
-      await db.put(
-        su.range.start.data,
-        su.range.end.data,
-        Coder.encode(record.toStruct())
+      await this.stateManager.insertUnverifiedStateUpdate(
+        su.depositContractAddress,
+        su
       )
     })
     await Promise.all(promises)
+
+    // TODO: fetch history proofs for unverified state udpate and verify them.
   }
 
   /**
@@ -185,8 +180,11 @@ export default class LightClient {
     to: Address
   ) {
     console.log('transfer :', amount, depositContractAddress, to)
-    const token = await this.searchRange(amount, depositContractAddress)
-    if (!token) {
+    const su = await this.stateManager.resolveStateUpdate(
+      depositContractAddress,
+      amount
+    )
+    if (!su) {
       throw new Error('Not enough amount')
     }
 
@@ -194,8 +192,8 @@ export default class LightClient {
     const tx = new Transaction(
       depositContractAddress,
       new Range(
-        token.range.start,
-        BigNumber.from(token.range.start.data + BigInt(amount))
+        su.range.start,
+        BigNumber.from(su.range.start.data + BigInt(amount))
       ),
       property,
       this.wallet.getAddress()
@@ -209,28 +207,20 @@ export default class LightClient {
     })
 
     if (res.status === 201) {
-      console.log('successfully deposited to contract')
+      console.log('successfully sent to aggregator')
+      await this.stateManager.removeVerifiedStateUpdate(
+        su.depositContractAddress,
+        su.range
+      )
+      await this.stateManager.insertPendingStateUpdate(
+        su.depositContractAddress,
+        su
+      )
     } else {
       throw new Error(
         `status: ${res.status}, transaction could not be accepted`
       )
     }
-  }
-
-  /**
-   * search coin range
-   * @param amount search range with greater than this amount
-   * @param depositContractAddress search this depositContractAddress
-   */
-  private async searchRange(
-    amount: number,
-    depositContractAddress: Address
-  ): Promise<StateUpdate | undefined> {
-    const db = await this.getStateDb(depositContractAddress)
-    const stateUpdates = await db.get(0n, 10000n)
-    return stateUpdates
-      .map(StateUpdate.fromRangeRecord)
-      .find(su => su.amount > BigInt(amount))
   }
 
   /**
@@ -270,18 +260,6 @@ export default class LightClient {
       erc20ContractAddress.data,
       this.tokenContractFactory(erc20ContractAddress)
     )
-  }
-
-  /**
-   * get range db which stores state updates of given deposit contract address
-   * @param depositContractAddress Deposit contract address
-   */
-  private async getStateDb(depositContractAddress: Address): Promise<RangeDb> {
-    const stateDb = await this.kvs.bucket(Bytes.fromString('state'))
-    const bucket = await stateDb.bucket(
-      Bytes.fromHexString(depositContractAddress.data)
-    )
-    return new RangeDb(bucket)
   }
 
   public async exit(amount: number, depositContractAddress: Address) {
