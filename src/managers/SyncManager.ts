@@ -10,7 +10,7 @@ export default class SyncManager {
   public async getLatestSyncedBlockNumber(): Promise<BigNumber> {
     const d = await this.db.get(LATEST_SYNCED_BLOCK)
 
-    if (!d) return BigNumber.from(0)
+    if (!d) return BigNumber.from(-1)
     return Coder.decode(BigNumber.default(), d)
   }
 
