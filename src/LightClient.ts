@@ -11,7 +11,7 @@ import { config } from 'dotenv'
 import { Property } from 'wakkanay/dist/ovm'
 import Coder from 'wakkanay-ethereum/dist/coder'
 import { KeyValueStore } from 'wakkanay/dist/db'
-import { StateUpdate, Transaction, Block } from 'wakkanay-ethereum-plasma'
+import { StateUpdate, Transaction } from 'wakkanay-ethereum-plasma'
 import axios from 'axios'
 import { DecoderUtil } from 'wakkanay/dist/utils'
 import StateManager from './managers/StateManager'
@@ -126,6 +126,7 @@ export default class LightClient {
    */
   private async syncStateUntill(blockNum: BigNumber): Promise<void> {
     let synced = await this.syncManager.getLatestSyncedBlockNumber()
+    console.log(`sync state from ${synced} to ${blockNum}`)
     if (synced.data > blockNum.data) {
       throw new Error('Synced state is greater than latest block')
     }
@@ -143,6 +144,7 @@ export default class LightClient {
    */
   private async syncState(blockNumber: BigNumber) {
     this._syncing = true
+    console.log(`syncing state: ${blockNumber}`)
     try {
       const res = await axios.get(
         `${process.env.AGGREGATOR_HOST}/sync_state?address=${this.address}&blockNumber=${blockNumber.data}`
@@ -158,7 +160,9 @@ export default class LightClient {
           )
       )
       const promises = stateUpdates.map(async su => {
-        await this.stateManager.insertUnverifiedStateUpdate(
+        // TODO: insert into unverified state update.
+        // await this.stateManager.insertUnverifiedStateUpdate(
+        await this.stateManager.insertVerifiedStateUpdate(
           su.depositContractAddress,
           su
         )
