@@ -193,7 +193,7 @@ export default class StateManager {
     const stateUpdates = await db.get(BigInt(0), BigInt(10000))
     const su = stateUpdates
       .map(StateUpdate.fromRangeRecord)
-      .find(su => su.amount > BigInt(amount))
+      .find(su => su.amount >= BigInt(amount))
     if (!su) return null
 
     su.update({
