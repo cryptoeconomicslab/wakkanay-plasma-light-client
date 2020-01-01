@@ -8,7 +8,7 @@ import {
   ICommitmentContract
 } from 'wakkanay/dist/contract'
 import { Property } from 'wakkanay/dist/ovm'
-import Coder from 'wakkanay-ethereum/dist/coder'
+import Coder from './Coder'
 import { KeyValueStore } from 'wakkanay/dist/db'
 import {
   StateUpdate,
@@ -17,8 +17,7 @@ import {
 } from 'wakkanay-ethereum-plasma'
 import axios from 'axios'
 import { DecoderUtil } from 'wakkanay/dist/utils'
-import StateManager from './managers/StateManager'
-import SyncManager from './managers/SyncManager'
+import { StateManager, SyncManager, CheckpointManager } from './managers'
 
 const DEPOSIT_CONTRACT_ADDRESS = Address.from(
   process.env.DEPOSIT_CONTRACT_ADDRESS as string
