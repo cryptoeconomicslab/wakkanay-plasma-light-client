@@ -190,7 +190,7 @@ export default class StateManager {
     amount: number
   ): Promise<StateUpdate | null> {
     const db = await this.getRangeDb(Kind.Verified, depositContractAddress)
-    const stateUpdates = await db.get(0n, 10000n)
+    const stateUpdates = await db.get(BigInt(0), BigInt(10000))
     const su = stateUpdates
       .map(StateUpdate.fromRangeRecord)
       .find(su => su.amount > BigInt(amount))

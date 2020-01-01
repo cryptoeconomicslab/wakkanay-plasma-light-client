@@ -95,7 +95,7 @@ export default class LightClient {
     const resultPromise = addrs.map(async addr => {
       const data = await this.stateManager.getVerifiedStateUpdates(
         Address.from(addr),
-        new Range(BigNumber.from(0n), BigNumber.from(10000n))
+        new Range(BigNumber.from(0), BigNumber.from(10000))
       )
       return {
         tokenAddress: addr,
@@ -132,7 +132,7 @@ export default class LightClient {
     }
 
     while (synced.data !== blockNum.data) {
-      synced = BigNumber.from(synced.data + 1n)
+      synced = BigNumber.from(synced.data + BigInt(1))
       await this.syncState(synced)
     }
   }
