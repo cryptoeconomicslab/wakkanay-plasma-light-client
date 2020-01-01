@@ -8,10 +8,8 @@ import {
   ERC20Contract,
   CommitmentContract
 } from 'wakkanay-ethereum/dist/contract'
-import { config } from 'dotenv'
 import StateManager from './managers/StateManager'
 import SyncManager from './managers/SyncManager'
-config()
 
 async function instantiate() {
   const kvs = new InMemoryKeyValueStore(Bytes.fromString('plasma_aggregator'))

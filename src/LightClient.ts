@@ -7,7 +7,6 @@ import {
   IERC20Contract,
   ICommitmentContract
 } from 'wakkanay/dist/contract'
-import { config } from 'dotenv'
 import { Property } from 'wakkanay/dist/ovm'
 import Coder from 'wakkanay-ethereum/dist/coder'
 import { KeyValueStore } from 'wakkanay/dist/db'
@@ -16,7 +15,6 @@ import axios from 'axios'
 import { DecoderUtil } from 'wakkanay/dist/utils'
 import StateManager from './managers/StateManager'
 import SyncManager from './managers/SyncManager'
-config()
 
 const DEPOSIT_CONTRACT_ADDRESS = Address.from(
   process.env.DEPOSIT_CONTRACT_ADDRESS as string
