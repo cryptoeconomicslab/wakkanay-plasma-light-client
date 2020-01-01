@@ -10,7 +10,11 @@ import {
 import { Property } from 'wakkanay/dist/ovm'
 import Coder from 'wakkanay-ethereum/dist/coder'
 import { KeyValueStore } from 'wakkanay/dist/db'
-import { StateUpdate, Transaction } from 'wakkanay-ethereum-plasma'
+import {
+  StateUpdate,
+  Transaction,
+  TransactionReceipt
+} from 'wakkanay-ethereum-plasma'
 import axios from 'axios'
 import { DecoderUtil } from 'wakkanay/dist/utils'
 import StateManager from './managers/StateManager'
@@ -241,20 +245,24 @@ export default class LightClient {
       data: Coder.encode(tx.toStruct()).toHexString()
     })
 
-    if (res.status === 201) {
-      console.log('successfully sent to aggregator')
-      await this.stateManager.removeVerifiedStateUpdate(
-        su.depositContractAddress,
-        su.range
+    if (res.data) {
+      const receipt = DecoderUtil.decodeStructable(
+        TransactionReceipt,
+        Coder,
+        Bytes.fromHexString(res.data)
       )
-      await this.stateManager.insertPendingStateUpdate(
-        su.depositContractAddress,
-        su
-      )
-    } else {
-      throw new Error(
-        `status: ${res.status}, transaction could not be accepted`
-      )
+      if (receipt.status == Integer.from(1)) {
+        await this.stateManager.removeVerifiedStateUpdate(
+          su.depositContractAddress,
+          su.range
+        )
+        await this.stateManager.insertPendingStateUpdate(
+          su.depositContractAddress,
+          su
+        )
+      } else {
+        throw new Error('Invalid transaction')
+      }
     }
   }
 
