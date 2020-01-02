@@ -13,7 +13,8 @@ import { KeyValueStore } from 'wakkanay/dist/db'
 import {
   StateUpdate,
   Transaction,
-  TransactionReceipt
+  TransactionReceipt,
+  Checkpoint
 } from 'wakkanay-ethereum-plasma'
 import axios from 'axios'
 import { DecoderUtil } from 'wakkanay/dist/utils'
@@ -298,6 +299,13 @@ export default class LightClient {
     this.tokenContracts.set(
       erc20ContractAddress.data,
       this.tokenContractFactory(erc20ContractAddress)
+    )
+
+    depositContract.subscribeCheckpointFinalized(
+      (checkpointId: Bytes, checkpoint: [Range, Property]) => {
+        const c = new Checkpoint(checkpoint[0], checkpoint[1])
+        this.checkpointManager.insertCheckpoint(checkpointId, c)
+      }
     )
   }
 

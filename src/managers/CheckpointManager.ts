@@ -1,8 +1,8 @@
 import { KeyValueStore } from 'wakkanay/dist/db'
-import { Property } from 'wakkanay/dist/ovm'
 import { Bytes } from 'wakkanay/dist/types'
 import Coder from '../Coder'
 import { DecoderUtil } from 'wakkanay/dist/utils'
+import { Checkpoint } from 'wakkanay-ethereum-plasma/dist/types'
 
 const kind = {
   verified: Bytes.fromString('verified'),
@@ -12,17 +12,17 @@ const kind = {
 export default class CheckpointManager {
   constructor(readonly kvs: KeyValueStore) {}
 
-  public async insertCheckpoint(checkpointId: Bytes, checkpoint: Property) {
+  public async insertCheckpoint(checkpointId: Bytes, checkpoint: Checkpoint) {
     const bucket = await this.kvs.bucket(kind.verified)
     await bucket.put(checkpointId, Coder.encode(checkpoint.toStruct()))
   }
 
-  public async getCheckpoint(checkpointId: Bytes): Promise<Property | null> {
+  public async getCheckpoint(checkpointId: Bytes): Promise<Checkpoint | null> {
     const bucket = await this.kvs.bucket(kind.verified)
     const res = await bucket.get(checkpointId)
     if (!res) return null
 
-    return DecoderUtil.decodeStructable(Property, Coder, res)
+    return DecoderUtil.decodeStructable(Checkpoint, Coder, res)
   }
 
   public async removeCheckpoint(checkpointId: Bytes) {
