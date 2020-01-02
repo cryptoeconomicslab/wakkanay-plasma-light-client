@@ -309,6 +309,15 @@ export default class LightClient {
           checkpointId,
           c
         )
+
+        const stateUpdate = new StateUpdate(checkpoint[1])
+        const owner = stateUpdate.getOwner()
+        if (owner && owner.data === this.wallet.getAddress().data) {
+          this.stateManager.insertVerifiedStateUpdate(
+            depositContractAddress,
+            stateUpdate
+          )
+        }
       }
     )
   }
