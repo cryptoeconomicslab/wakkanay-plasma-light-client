@@ -304,7 +304,11 @@ export default class LightClient {
     depositContract.subscribeCheckpointFinalized(
       (checkpointId: Bytes, checkpoint: [Range, Property]) => {
         const c = new Checkpoint(checkpoint[0], checkpoint[1])
-        this.checkpointManager.insertCheckpoint(checkpointId, c)
+        this.checkpointManager.insertCheckpoint(
+          depositContractAddress,
+          checkpointId,
+          c
+        )
       }
     )
   }
