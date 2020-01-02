@@ -29,27 +29,4 @@ export default class CheckpointManager {
     const bucket = await this.kvs.bucket(kind.verified)
     await bucket.del(checkpointId)
   }
-
-  public async getPendingCheckpoint(
-    checkpointId: Bytes
-  ): Promise<Property | null> {
-    const bucket = await this.kvs.bucket(kind.pending)
-    const res = await bucket.get(checkpointId)
-    if (!res) return null
-
-    return DecoderUtil.decodeStructable(Property, Coder, res)
-  }
-
-  public async insertPendingCheckpoint(
-    checkpointId: Bytes,
-    checkpoint: Property
-  ): Promise<void> {
-    const bucket = await this.kvs.bucket(kind.pending)
-    await bucket.put(checkpointId, Coder.encode(checkpoint.toStruct()))
-  }
-
-  public async removePendingCheckpoint(checkpointId: Bytes) {
-    const bucket = await this.kvs.bucket(kind.pending)
-    await bucket.del(checkpointId)
-  }
 }
