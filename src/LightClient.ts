@@ -64,7 +64,8 @@ export default class LightClient {
     private tokenContractFactory: (address: Address) => IERC20Contract,
     private commitmentContract: ICommitmentContract,
     private stateManager: StateManager,
-    private syncManager: SyncManager
+    private syncManager: SyncManager,
+    private checkpointManager: CheckpointManager
   ) {
     // this.kvs = new db.IndexedDbKeyValueStore()
     this.depositContracts.set(
@@ -250,7 +251,8 @@ export default class LightClient {
         Coder,
         Bytes.fromHexString(res.data)
       )
-      if (receipt.status == Integer.from(1)) {
+      console.log(receipt)
+      if (receipt.status.data === 1) {
         await this.stateManager.removeVerifiedStateUpdate(
           su.depositContractAddress,
           su.range
