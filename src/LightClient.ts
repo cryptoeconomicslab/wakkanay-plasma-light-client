@@ -1,7 +1,8 @@
 import { Address, Bytes, Integer, Range, BigNumber } from 'wakkanay/dist/types'
 import { IWallet } from 'wakkanay/dist/wallet'
 import { FreeVariable } from 'wakkanay/dist/ovm'
-import { DepositContract } from 'wakkanay-ethereum/dist/contract'
+import { DepositContract, PETHContract } from 'wakkanay-ethereum/dist/contract'
+import { EthWallet } from 'wakkanay-ethereum/dist/wallet'
 import {
   IDepositContract,
   IERC20Contract,
@@ -68,7 +69,7 @@ export default class LightClient {
     private syncManager: SyncManager,
     private checkpointManager: CheckpointManager
   ) {
-    this.registerToken(ETH_ADDRESS, DEPOSIT_CONTRACT_ADDRESS)
+    this.registerPethContract(ETH_ADDRESS, DEPOSIT_CONTRACT_ADDRESS)
   }
 
   public get address(): string {
@@ -181,22 +182,33 @@ export default class LightClient {
    * @param erc20ContractAddress ERC20 token address, undefined for ETH
    */
   public async deposit(amount: number, erc20ContractAddress?: Address) {
-    const depositContract = this.getDepositContract(
-      erc20ContractAddress || ETH_ADDRESS
-    )
-    const tokenContract = this.getTokenContract(
-      erc20ContractAddress || ETH_ADDRESS
-    )
+    const myAddress = this.wallet.getAddress()
 
+    if (!erc20ContractAddress) {
+      const depositContract = this.getDepositContract(
+        DEPOSIT_CONTRACT_ADDRESS
+      ) as DepositContract
+      const tokenContract = this.getTokenContract(
+        DEPOSIT_CONTRACT_ADDRESS
+      ) as PETHContract
+      await tokenContract.wrap(amount.toString())
+      await tokenContract.approve(depositContract.address, Integer.from(amount))
+      await depositContract.deposit(
+        Integer.from(amount),
+        ownershipProperty(myAddress)
+      )
+
+      return
+    }
+
+    const depositContract = this.getDepositContract(erc20ContractAddress)
+    const tokenContract = this.getTokenContract(erc20ContractAddress)
     console.log('deposit: ', depositContract, tokenContract)
     if (!depositContract || !tokenContract) {
       throw new Error('Contract not found.')
     }
 
-    const myAddress = this.wallet.getAddress()
     await tokenContract.approve(depositContract.address, Integer.from(amount))
-
-    // TODO: how to handle result
     await depositContract.deposit(
       Integer.from(amount),
       ownershipProperty(myAddress)
@@ -283,6 +295,21 @@ export default class LightClient {
     return this.tokenContracts.get(erc20ContractAddress.data)
   }
 
+  private registerPethContract(
+    pethContractAddress: Address,
+    depositContractAddress: Address
+  ) {
+    const depositContract = this.depositContractFactory(depositContractAddress)
+    this.depositContracts.set(depositContractAddress.data, depositContract)
+    this.tokenContracts.set(
+      depositContractAddress.data,
+      new PETHContract(
+        pethContractAddress,
+        (this.wallet as EthWallet).getEthersWallet()
+      )
+    )
+  }
+
   /**
    * register new ERC20 token
    * @param erc20ContractAddress ERC20 token address to register
@@ -295,9 +322,8 @@ export default class LightClient {
     console.log('contracts set for token:', erc20ContractAddress.data)
     const depositContract = this.depositContractFactory(depositContractAddress)
     this.depositContracts.set(depositContractAddress.data, depositContract)
-    this.depositContracts.set(erc20ContractAddress.data, depositContract)
     this.tokenContracts.set(
-      erc20ContractAddress.data,
+      depositContractAddress.data,
       this.tokenContractFactory(erc20ContractAddress)
     )
 
