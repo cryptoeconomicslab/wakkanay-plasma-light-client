@@ -308,6 +308,32 @@ export default class LightClient {
         (this.wallet as EthWallet).getEthersWallet()
       )
     )
+
+    depositContract.subscribeCheckpointFinalized(
+      (checkpointId: Bytes, checkpoint: [Range, Property]) => {
+        const c = new Checkpoint(checkpoint[0], checkpoint[1])
+        console.log(checkpointId, c)
+        this.checkpointManager.insertCheckpoint(
+          depositContractAddress,
+          checkpointId,
+          c
+        )
+
+        const stateUpdate = new StateUpdate(checkpoint[1])
+        stateUpdate.update({
+          range: new Range(stateUpdate.range.end, stateUpdate.range.start)
+        })
+        const owner = stateUpdate.getOwner()
+        if (owner && owner.data === this.wallet.getAddress().data) {
+          console.log('owner: ', owner)
+          console.log(stateUpdate)
+          this.stateManager.insertVerifiedStateUpdate(
+            depositContractAddress,
+            stateUpdate
+          )
+        }
+      }
+    )
   }
 
   /**
