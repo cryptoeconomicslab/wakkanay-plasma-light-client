@@ -320,9 +320,6 @@ export default class LightClient {
         )
 
         const stateUpdate = new StateUpdate(checkpoint[1])
-        stateUpdate.update({
-          range: new Range(stateUpdate.range.end, stateUpdate.range.start)
-        })
         const owner = stateUpdate.getOwner()
         if (owner && owner.data === this.wallet.getAddress().data) {
           console.log('owner: ', owner)
