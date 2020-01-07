@@ -20,6 +20,8 @@ import {
 import axios from 'axios'
 import { DecoderUtil } from 'wakkanay/dist/utils'
 import { StateManager, SyncManager, CheckpointManager } from './managers'
+import { DoubleLayerInclusionProof } from 'wakkanay/dist/verifiers'
+import { verifiers } from 'wakkanay'
 
 const DEPOSIT_CONTRACT_ADDRESS = Address.from(
   process.env.DEPOSIT_CONTRACT_ADDRESS as string
@@ -113,6 +115,7 @@ export default class LightClient {
     this.commitmentContract.subscribeBlockSubmitted((blockNumber, root) => {
       console.log('new block submitted event:', root.toHexString())
       this.syncState(blockNumber)
+      this.verifyPendingStateUpdates(blockNumber)
     })
   }
 
@@ -171,6 +174,57 @@ export default class LightClient {
     } finally {
       this._syncing = false
     }
+  }
+
+  private async verifyPendingStateUpdates(blockNumber: BigNumber) {
+    console.group('VERIFY PENDING STATE UPDATES: ', blockNumber)
+    Object.keys(this.depositContracts).forEach(async addr => {
+      const pendingStateUpdates = await this.stateManager.getPendingStateUpdates(
+        Address.from(addr),
+        new Range(BigNumber.from(0), BigNumber.from(10000n))
+      )
+      const verifier = new verifiers.DoubleLayerTreeVerifier()
+      const root = await this.syncManager.getRoot(blockNumber)
+      if (!root) {
+        return
+      }
+
+      pendingStateUpdates.forEach(async su => {
+        console.info(
+          `Verify pended state update: (${su.range.start.data.toString()}, ${su.range.end.data.toString()})`
+        )
+        const res = await axios.get(
+          `${
+            process.env.AGGREGATOR_HOST
+          }/inclusion_proof?blockNumber=${su.blockNumber.toString()}&stateUpdate=${Coder.encode(
+            su.property.toStruct()
+          ).toHexString()}`
+        )
+        if (res.status === 404) {
+          return
+        }
+        const inclusionProof = DecoderUtil.decodeStructable(
+          DoubleLayerInclusionProof,
+          Coder,
+          Bytes.fromHexString(res.data.data)
+        )
+        const leaf = new verifiers.DoubleLayerTreeLeaf(
+          su.depositContractAddress,
+          su.range.start,
+          verifiers.Keccak256.hash(Coder.encode(su.property.toStruct()))
+        )
+        if (verifier.verifyInclusion(leaf, su.range, root, inclusionProof)) {
+          console.info(
+            `Pended state update (${su.range.start.data.toString()}, ${su.range.end.data.toString()}) verified. remove from stateDB`
+          )
+          await this.stateManager.removePendingStateUpdate(
+            su.depositContractAddress,
+            su.range
+          )
+        }
+      })
+    })
+    console.groupEnd()
   }
 
   /**
