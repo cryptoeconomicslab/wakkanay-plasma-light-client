@@ -94,14 +94,11 @@ export default class LightClient {
     const resultPromise = addrs.map(async addr => {
       const data = await this.stateManager.getVerifiedStateUpdates(
         Address.from(addr),
-        new Range(BigNumber.from(0), BigNumber.from(10000))
+        new Range(BigNumber.from(0), BigNumber.from(10000)) // TODO: get all stateUpdate method
       )
       return {
         tokenAddress: addr,
-        amount: data.reduce(
-          (p, s) => p + Number(s.range.end.data - s.range.start.data),
-          0
-        )
+        amount: data.reduce((p, s) => p + Number(s.amount), 0)
       }
     })
     return await Promise.all(resultPromise)
