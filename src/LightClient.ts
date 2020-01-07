@@ -312,7 +312,6 @@ export default class LightClient {
     depositContract.subscribeCheckpointFinalized(
       (checkpointId: Bytes, checkpoint: [Range, Property]) => {
         const c = new Checkpoint(checkpoint[0], checkpoint[1])
-        console.log(checkpointId, c)
         this.checkpointManager.insertCheckpoint(
           depositContractAddress,
           checkpointId,
@@ -322,8 +321,6 @@ export default class LightClient {
         const stateUpdate = new StateUpdate(checkpoint[1])
         const owner = stateUpdate.getOwner()
         if (owner && owner.data === this.wallet.getAddress().data) {
-          console.log('owner: ', owner)
-          console.log(stateUpdate)
           this.stateManager.insertVerifiedStateUpdate(
             depositContractAddress,
             stateUpdate
