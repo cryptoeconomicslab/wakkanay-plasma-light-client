@@ -12,8 +12,8 @@ describe('SyncManager', () => {
 
   test('get and update', async () => {
     let blockNumber = await syncManager.getLatestSyncedBlockNumber()
-    expect(blockNumber).toEqual(BigNumber.from(0))
-    syncManager.updateSyncedBlockNumber(BigNumber.from(3))
+    expect(blockNumber).toEqual(BigNumber.from(-1))
+    syncManager.updateSyncedBlockNumber(BigNumber.from(3), Bytes.default())
     blockNumber = await syncManager.getLatestSyncedBlockNumber()
     expect(blockNumber).toEqual(BigNumber.from(3))
   })

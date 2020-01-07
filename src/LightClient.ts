@@ -110,13 +110,13 @@ export default class LightClient {
    * start LiteClient process.
    */
   public async start() {
-    const blockNumber = await this.commitmentContract.getCurrentBlock()
-    await this.syncStateUntill(blockNumber)
     this.commitmentContract.subscribeBlockSubmitted((blockNumber, root) => {
       console.log('new block submitted event:', root.toHexString())
-      this.syncState(blockNumber)
+      this.syncState(blockNumber, root)
       this.verifyPendingStateUpdates(blockNumber)
     })
+    const blockNumber = await this.commitmentContract.getCurrentBlock()
+    await this.syncStateUntill(blockNumber)
   }
 
   /**
@@ -132,7 +132,12 @@ export default class LightClient {
 
     while (synced.data !== blockNum.data) {
       synced = BigNumber.from(synced.data + BigInt(1))
-      await this.syncState(synced)
+      const root = await this.commitmentContract.getRoot(synced)
+      if (!root) {
+        // FIXME: check if root is default bytes32 value
+        throw new Error('Block root hash is null')
+      }
+      await this.syncState(synced, root)
     }
   }
 
@@ -140,8 +145,9 @@ export default class LightClient {
    * fetch latest state from aggregator
    * update local database with new state updates.
    * @param blockNumber block number to sync state
+   * @param root root hash of new block to be synced
    */
-  private async syncState(blockNumber: BigNumber) {
+  private async syncState(blockNumber: BigNumber, root: Bytes) {
     this._syncing = true
     console.log(`syncing state: ${blockNumber}`)
     try {
@@ -167,8 +173,8 @@ export default class LightClient {
         )
       })
       await Promise.all(promises)
-      await this.syncManager.updateSyncedBlockNumber(blockNumber)
-      // TODO: fetch history proofs for unverified state udpate and verify them.
+      await this.syncManager.updateSyncedBlockNumber(blockNumber, root)
+      // TODO: fetch history proofs for unverified state update and verify them.
     } catch (e) {
       console.log(e)
     } finally {
