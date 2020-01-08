@@ -1,5 +1,7 @@
-import { KeyValueStore } from 'wakkanay/dist/db'
-import { BigNumber, Bytes } from 'wakkanay/dist/types'
+import { types, db } from 'wakkanay-ethereum-plasma'
+import KeyValueStore = db.KeyValueStore
+import Bytes = types.Bytes
+import BigNumber = types.BigNumber
 import Coder from '../Coder'
 
 const LATEST_SYNCED_BLOCK = Bytes.fromString('latest_synced_block')

@@ -1,8 +1,10 @@
-import { KeyValueStore } from 'wakkanay/dist/db'
-import { Address, Bytes } from 'wakkanay/dist/types'
+import { types, db, Checkpoint, utils } from 'wakkanay-ethereum-plasma'
+import Address = types.Address
+import Bytes = types.Bytes
+import KeyValueStore = db.KeyValueStore
+import DecoderUtil = utils.DecoderUtil
+
 import Coder from '../Coder'
-import { DecoderUtil } from 'wakkanay/dist/utils'
-import { Checkpoint } from 'wakkanay-ethereum-plasma/dist/types'
 
 export default class CheckpointManager {
   constructor(readonly kvs: KeyValueStore) {}

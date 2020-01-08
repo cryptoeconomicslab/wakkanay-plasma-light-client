@@ -1,27 +1,39 @@
-import { Address, Bytes, Integer, Range, BigNumber } from 'wakkanay/dist/types'
-import { IWallet } from 'wakkanay/dist/wallet'
-import { FreeVariable } from 'wakkanay/dist/ovm'
-import { DepositContract, PETHContract } from 'wakkanay-ethereum/dist/contract'
-import { EthWallet } from 'wakkanay-ethereum/dist/wallet'
 import {
-  IDepositContract,
-  IERC20Contract,
-  ICommitmentContract
-} from 'wakkanay/dist/contract'
-import { Property } from 'wakkanay/dist/ovm'
-import Coder from './Coder'
-import { KeyValueStore } from 'wakkanay/dist/db'
-import {
+  ovm,
+  types,
+  db,
+  contract,
+  wallet,
+  utils,
+  ethContract,
   StateUpdate,
   Transaction,
   TransactionReceipt,
-  Checkpoint
+  Checkpoint,
+  ethWallet,
+  verifiers
 } from 'wakkanay-ethereum-plasma'
+import Property = ovm.Property
+import FreeVariable = ovm.FreeVariable
+import Address = types.Address
+import Bytes = types.Bytes
+import BigNumber = types.BigNumber
+import Integer = types.Integer
+import Range = types.Range
+import KeyValueStore = db.KeyValueStore
+import ICommitmentContract = contract.ICommitmentContract
+import IDepositContract = contract.IDepositContract
+import IERC20Contract = contract.IERC20Contract
+import PETHContract = ethContract.PETHContract
+import DepositContract = ethContract.DepositContract
+import IWallet = wallet.IWallet
+import DecoderUtil = utils.DecoderUtil
+import EthWallet = ethWallet.EthWallet
+import DoubleLayerInclusionProof = verifiers.DoubleLayerInclusionProof
+
+import Coder from './Coder'
 import axios from 'axios'
-import { DecoderUtil } from 'wakkanay/dist/utils'
 import { StateManager, SyncManager, CheckpointManager } from './managers'
-import { DoubleLayerInclusionProof } from 'wakkanay/dist/verifiers'
-import { verifiers } from 'wakkanay'
 
 const DEPOSIT_CONTRACT_ADDRESS = Address.from(
   process.env.DEPOSIT_CONTRACT_ADDRESS as string

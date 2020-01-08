@@ -1,6 +1,11 @@
-import { KeyValueStore, RangeDb } from 'wakkanay/dist/db'
-import { StateUpdate } from 'wakkanay-ethereum-plasma'
-import { BigNumber, Bytes, Range, Address } from 'wakkanay/dist/types'
+import { types, db, StateUpdate } from 'wakkanay-ethereum-plasma'
+import Address = types.Address
+import Bytes = types.Bytes
+import BigNumber = types.BigNumber
+import Range = types.Range
+import KeyValueStore = db.KeyValueStore
+import RangeDb = db.RangeDb
+
 import Coder from '../Coder'
 
 enum Kind {
