@@ -303,14 +303,17 @@ export default class LightClient {
     if (!su) {
       throw new Error('Not enough amount')
     }
+    su.update({
+      range: new Range(
+        su.range.start,
+        BigNumber.from(su.range.start.data + BigInt(amount))
+      )
+    })
 
     const property = ownershipProperty(to)
     const tx = new Transaction(
       depositContractAddress,
-      new Range(
-        su.range.start,
-        BigNumber.from(su.range.start.data + BigInt(amount))
-      ),
+      su.range,
       property,
       this.wallet.getAddress()
     )
