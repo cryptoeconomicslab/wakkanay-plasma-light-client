@@ -393,9 +393,9 @@ export default class LightClient {
     )
 
     depositContract.subscribeCheckpointFinalized(
-      (checkpointId: Bytes, checkpoint: [Range, Property]) => {
+      async (checkpointId: Bytes, checkpoint: [Range, Property]) => {
         const c = new Checkpoint(checkpoint[0], checkpoint[1])
-        this.checkpointManager.insertCheckpoint(
+        await this.checkpointManager.insertCheckpoint(
           depositContractAddress,
           checkpointId,
           c
@@ -404,7 +404,7 @@ export default class LightClient {
         const stateUpdate = new StateUpdate(checkpoint[1])
         const owner = stateUpdate.getOwner()
         if (owner && owner.data === this.wallet.getAddress().data) {
-          this.stateManager.insertVerifiedStateUpdate(
+          await this.stateManager.insertVerifiedStateUpdate(
             depositContractAddress,
             stateUpdate
           )
@@ -437,9 +437,9 @@ export default class LightClient {
     )
 
     depositContract.subscribeCheckpointFinalized(
-      (checkpointId: Bytes, checkpoint: [Range, Property]) => {
+      async (checkpointId: Bytes, checkpoint: [Range, Property]) => {
         const c = new Checkpoint(checkpoint[0], checkpoint[1])
-        this.checkpointManager.insertCheckpoint(
+        await this.checkpointManager.insertCheckpoint(
           depositContractAddress,
           checkpointId,
           c
@@ -448,7 +448,7 @@ export default class LightClient {
         const stateUpdate = new StateUpdate(checkpoint[1])
         const owner = stateUpdate.getOwner()
         if (owner && owner.data === this.wallet.getAddress().data) {
-          this.stateManager.insertVerifiedStateUpdate(
+          await this.stateManager.insertVerifiedStateUpdate(
             depositContractAddress,
             stateUpdate
           )
