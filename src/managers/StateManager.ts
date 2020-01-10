@@ -63,6 +63,7 @@ export default class StateManager {
 
   /**
    * remove StateUpdate of given range in database
+   * because RangeDb.delete method remove whole intersected range, temporarily update removed range and delete it.
    * @param kind (Verified | Unverified | Pending) represent the state of StateUpdate
    * @param depositContractAddress deposit contract address of StateUpdate
    * @param range Range to be removed
@@ -73,6 +74,7 @@ export default class StateManager {
     range: Range
   ): Promise<void> {
     const db = await this.getRangeDb(kind, depositContractAddress)
+    await db.put(range.start.data, range.end.data, Bytes.default())
     await db.del(range.start.data, range.end.data)
   }
 
