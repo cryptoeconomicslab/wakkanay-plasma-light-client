@@ -33,6 +33,7 @@ import DoubleLayerInclusionProof = verifiers.DoubleLayerInclusionProof
 
 import Coder from './Coder'
 import axios from 'axios'
+import EventEmitter from 'event-emitter'
 import { StateManager, SyncManager, CheckpointManager } from './managers'
 
 const DEPOSIT_CONTRACT_ADDRESS = Address.from(
@@ -68,10 +69,18 @@ function ownershipProperty(owner: Address) {
   ])
 }
 
+enum EmitterEvent {
+  CHECKPOINT_FINALIZED = 'CHECKPOINT_FINALIZED',
+  TRANSFER_COMPLETE = 'TRANSFER_COMPLETE',
+  SYNC_FINISHED = 'SYNC_FINISHED',
+  EXIT_FINALIZED = 'EXIT_FINALIZED'
+}
+
 export default class LightClient {
   private depositContracts: Map<string, IDepositContract> = new Map()
   private tokenContracts: Map<string, IERC20Contract> = new Map()
   private _syncing = false
+  private ee = EventEmitter()
 
   constructor(
     private wallet: IWallet,
@@ -187,6 +196,7 @@ export default class LightClient {
       await Promise.all(promises)
       await this.syncManager.updateSyncedBlockNumber(blockNumber, root)
       // TODO: fetch history proofs for unverified state update and verify them.
+      this.ee.emit(EmitterEvent.SYNC_FINISHED, blockNumber)
     } catch (e) {
       console.log(e)
     } finally {
@@ -239,6 +249,7 @@ export default class LightClient {
             su.depositContractAddress,
             su.range
           )
+          this.ee.emit(EmitterEvent.TRANSFER_COMPLETE, su)
         }
       })
     })
@@ -398,6 +409,12 @@ export default class LightClient {
             stateUpdate
           )
         }
+
+        this.ee.emit(
+          EmitterEvent.CHECKPOINT_FINALIZED,
+          checkpointId,
+          checkpoint
+        )
       }
     )
   }
@@ -436,6 +453,11 @@ export default class LightClient {
             stateUpdate
           )
         }
+        this.ee.emit(
+          EmitterEvent.CHECKPOINT_FINALIZED,
+          checkpointId,
+          checkpoint
+        )
       }
     )
   }
@@ -444,7 +466,52 @@ export default class LightClient {
     // TODO: implement
   }
 
-  public async finalizeExit(exitId: string) {
+  public async finalizeExit(exitId: Bytes) {
     // TODO: implement
+
+    // when complete
+    {
+      this.ee.emit(EmitterEvent.EXIT_FINALIZED, exitId)
+    }
+  }
+
+  //
+  // Events subscriptions
+  //
+
+  public subscribeCheckpointFinalized(
+    handler: (checkpointId: Bytes, checkpoint: [Range, Property]) => void
+  ) {
+    this.ee.on(EmitterEvent.CHECKPOINT_FINALIZED, handler)
+  }
+
+  public subscribeSyncFinished(handler: (blockNumber: BigNumber) => void) {
+    this.ee.on(EmitterEvent.SYNC_FINISHED, handler)
+  }
+
+  public subscribeTransferComplete(handler: (su: StateUpdate) => void) {
+    this.ee.on(EmitterEvent.TRANSFER_COMPLETE, handler)
+  }
+
+  public subscribeExitFinalized(handler: (exitId: Bytes) => void) {
+    this.ee.on(EmitterEvent.EXIT_FINALIZED, handler)
+  }
+
+  public unsubscribeCheckpointFinalized(
+    handler: (checkpointId: Bytes, checkpoint: [Range, Property]) => void
+  ) {
+    this.ee.off(EmitterEvent.CHECKPOINT_FINALIZED, handler)
+  }
+
+  public unsubscribeSyncFinished(handler: (blockNumber: BigNumber) => void) {
+    this.ee.off(EmitterEvent.SYNC_FINISHED, handler)
+  }
+
+  public unsubscribeTransferComplete(handler: (su: StateUpdate) => void) {
+    this.ee.off(EmitterEvent.TRANSFER_COMPLETE, handler)
+  }
+
+  public unsubscribeExitFinalized(handler: (exitId: Bytes) => void) {
+    this.ee.off(EmitterEvent.EXIT_FINALIZED, handler)
   }
 }
