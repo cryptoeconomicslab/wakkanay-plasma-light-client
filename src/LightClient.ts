@@ -209,7 +209,7 @@ export default class LightClient {
     Object.keys(this.depositContracts).forEach(async addr => {
       const pendingStateUpdates = await this.stateManager.getPendingStateUpdates(
         Address.from(addr),
-        new Range(BigNumber.from(0), BigNumber.from(10000n))
+        new Range(BigNumber.from(0), BigNumber.from(BigInt(10000)))
       )
       const verifier = new verifiers.DoubleLayerTreeVerifier()
       const root = await this.syncManager.getRoot(blockNumber)
