@@ -1,8 +1,12 @@
 import StateManager from '../src/managers/StateManager'
-import { KeyValueStore, InMemoryKeyValueStore } from 'wakkanay/dist/db'
-import { Range, BigNumber, Bytes, Address } from 'wakkanay/dist/types'
-import { StateUpdate } from 'wakkanay-ethereum-plasma'
-import { Property } from 'wakkanay/dist/ovm'
+import { types, db, ovm, StateUpdate } from 'wakkanay-ethereum-plasma'
+import KeyValueStore = db.KeyValueStore
+import InMemoryKeyValueStore = db.InMemoryKeyValueStore
+import Range = types.Range
+import Bytes = types.Bytes
+import BigNumber = types.BigNumber
+import Address = types.Address
+import Property = ovm.Property
 import Coder from '../src/Coder'
 
 function su(start: bigint, end: bigint): StateUpdate {

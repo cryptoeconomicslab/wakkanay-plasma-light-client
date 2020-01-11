@@ -1,6 +1,9 @@
 import SyncManager from '../src/managers/SyncManager'
-import { KeyValueStore, InMemoryKeyValueStore } from 'wakkanay/dist/db'
-import { Bytes, BigNumber } from 'wakkanay/dist/types/Codables'
+import { types, db } from 'wakkanay-ethereum-plasma'
+import KeyValueStore = db.KeyValueStore
+import InMemoryKeyValueStore = db.InMemoryKeyValueStore
+import Bytes = types.Bytes
+import BigNumber = types.BigNumber
 
 describe('SyncManager', () => {
   let syncManager: SyncManager, db: KeyValueStore
