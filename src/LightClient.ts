@@ -45,30 +45,6 @@ const IS_VALID_SIGNATURE_ADDRESS = Address.from(
   process.env.IS_VALID_SIG_ADDRESS
 )
 
-// TODO: extract and use compiled property
-function ownershipProperty(owner: Address) {
-  const hint = Bytes.fromString('tx,key')
-  const sigHint = Bytes.fromString('sig,key')
-  return new Property(THERE_EXISTS_ADDRESS, [
-    hint,
-    Bytes.fromString('tx'),
-    Coder.encode(
-      new Property(THERE_EXISTS_ADDRESS, [
-        sigHint,
-        Bytes.fromString('sig'),
-        Coder.encode(
-          new Property(IS_VALID_SIGNATURE_ADDRESS, [
-            FreeVariable.from('tx'),
-            FreeVariable.from('sig'),
-            Coder.encode(owner),
-            Bytes.fromString('secp256k1')
-          ]).toStruct()
-        )
-      ]).toStruct()
-    )
-  ])
-}
-
 enum EmitterEvent {
   CHECKPOINT_FINALIZED = 'CHECKPOINT_FINALIZED',
   TRANSFER_COMPLETE = 'TRANSFER_COMPLETE',
@@ -81,6 +57,7 @@ export default class LightClient {
   private tokenContracts: Map<string, IERC20Contract> = new Map()
   private _syncing = false
   private ee = EventEmitter()
+  private ownershipPredicate: ovm.CompiledPredicate
 
   constructor(
     private wallet: IWallet,
@@ -90,9 +67,27 @@ export default class LightClient {
     private commitmentContract: ICommitmentContract,
     private stateManager: StateManager,
     private syncManager: SyncManager,
-    private checkpointManager: CheckpointManager
+    private checkpointManager: CheckpointManager,
+    readonly deciderManager: ovm.DeciderManager
   ) {
+    const ownershipPredicate = this.deciderManager.compiledPredicateMap.get(
+      'Ownership'
+    )
+    if (ownershipPredicate === undefined) {
+      throw new Error('Ownership not found')
+    }
+    this.ownershipPredicate = ownershipPredicate
     this.registerPethContract(ETH_ADDRESS, DEPOSIT_CONTRACT_ADDRESS)
+  }
+
+  public ownershipProperty(owner: Address): Property {
+    return this.ownershipPredicate.makeProperty([
+      Bytes.fromHexString(owner.data)
+    ])
+  }
+
+  public getOwner(stateUpdate: StateUpdate): Address {
+    return Address.from(stateUpdate.stateObject.inputs[0].toHexString())
   }
 
   public get address(): string {
@@ -275,7 +270,7 @@ export default class LightClient {
       await tokenContract.approve(depositContract.address, Integer.from(amount))
       await depositContract.deposit(
         Integer.from(amount),
-        ownershipProperty(myAddress)
+        this.ownershipProperty(myAddress)
       )
 
       return
@@ -291,7 +286,7 @@ export default class LightClient {
     await tokenContract.approve(depositContract.address, Integer.from(amount))
     await depositContract.deposit(
       Integer.from(amount),
-      ownershipProperty(myAddress)
+      this.ownershipProperty(myAddress)
     )
   }
 
@@ -321,7 +316,7 @@ export default class LightClient {
       )
     })
 
-    const property = ownershipProperty(to)
+    const property = this.ownershipProperty(to)
     const tx = new Transaction(
       depositContractAddress,
       su.range,
@@ -402,7 +397,7 @@ export default class LightClient {
         )
 
         const stateUpdate = new StateUpdate(checkpoint[1])
-        const owner = stateUpdate.getOwner()
+        const owner = this.getOwner(stateUpdate)
         if (owner && owner.data === this.wallet.getAddress().data) {
           await this.stateManager.insertVerifiedStateUpdate(
             depositContractAddress,
@@ -446,7 +441,7 @@ export default class LightClient {
         )
 
         const stateUpdate = new StateUpdate(checkpoint[1])
-        const owner = stateUpdate.getOwner()
+        const owner = this.getOwner(stateUpdate)
         if (owner && owner.data === this.wallet.getAddress().data) {
           await this.stateManager.insertVerifiedStateUpdate(
             depositContractAddress,
