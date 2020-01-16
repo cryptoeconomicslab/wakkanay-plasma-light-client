@@ -320,6 +320,7 @@ export default class LightClient {
     const tx = new Transaction(
       depositContractAddress,
       su.range,
+      su.blockNumber,
       property,
       this.wallet.getAddress()
     )
