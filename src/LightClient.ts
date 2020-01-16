@@ -325,7 +325,10 @@ export default class LightClient {
       this.wallet.getAddress()
     )
 
-    const sig = await this.wallet.signMessage(Coder.encode(tx.body))
+    // TODO: specify transaction address
+    const sig = await this.wallet.signMessage(
+      Coder.encode(tx.toProperty(Address.default()).toStruct())
+    )
     tx.signature = sig
 
     const res = await axios.post(`${process.env.AGGREGATOR_HOST}/send_tx`, {
