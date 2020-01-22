@@ -34,9 +34,9 @@ import {
 } from '@cryptoeconomicslab/merkle-tree'
 import { Keccak256 } from '@cryptoeconomicslab/hash'
 
-import axios from 'axios'
 import EventEmitter from 'event-emitter'
 import { StateManager, SyncManager, CheckpointManager } from './managers'
+import APIClient from './APIClient'
 import * as Config from './config/config.local.json'
 
 const DEPOSIT_CONTRACT_ADDRESS = Address.from(
@@ -169,9 +169,7 @@ export default class LightClient {
     this._syncing = true
     console.log(`syncing state: ${blockNumber}`)
     try {
-      const res = await axios.get(
-        `${process.env.AGGREGATOR_HOST}/sync_state?address=${this.address}&blockNumber=${blockNumber.data}`
-      )
+      const res = await APIClient.syncState(this.address, blockNumber)
       const stateUpdates: StateUpdate[] = res.data.map((s: string) =>
         StateUpdate.fromProperty(
           decodeStructable(Property, ovmContext.coder, Bytes.fromHexString(s))
@@ -213,13 +211,7 @@ export default class LightClient {
         console.info(
           `Verify pended state update: (${su.range.start.data.toString()}, ${su.range.end.data.toString()})`
         )
-        const res = await axios.get(
-          `${
-            process.env.AGGREGATOR_HOST
-          }/inclusion_proof?blockNumber=${su.blockNumber.toString()}&stateUpdate=${ovmContext.coder
-            .encode(su.property.toStruct())
-            .toHexString()}`
-        )
+        const res = await APIClient.inclusionProof(su)
         if (res.status === 404) {
           return
         }
@@ -328,9 +320,7 @@ export default class LightClient {
     )
     tx.signature = sig
 
-    const res = await axios.post(`${process.env.AGGREGATOR_HOST}/send_tx`, {
-      data: ovmContext.coder.encode(tx.toStruct()).toHexString()
-    })
+    const res = await APIClient.sendTransaction(tx)
 
     if (res.data) {
       const receipt = decodeStructable(
