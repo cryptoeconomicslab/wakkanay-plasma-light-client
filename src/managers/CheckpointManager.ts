@@ -1,16 +1,13 @@
-import { types, db, Checkpoint, utils } from 'wakkanay-ethereum-plasma'
-import Address = types.Address
-import Bytes = types.Bytes
-import KeyValueStore = db.KeyValueStore
-import DecoderUtil = utils.DecoderUtil
-
-import Coder from '../Coder'
+import { Checkpoint } from '@cryptoeconomicslab/plasma'
+import { Address, Bytes } from '@cryptoeconomicslab/primitives'
+import { decodeStructable } from '@cryptoeconomicslab/coder'
+import { KeyValueStore } from '@cryptoeconomicslab/db'
 
 export default class CheckpointManager {
   constructor(readonly kvs: KeyValueStore) {}
 
   private async getBucket(addr: Address): Promise<KeyValueStore> {
-    return await this.kvs.bucket(Coder.encode(addr))
+    return await this.kvs.bucket(ovmContext.coder.encode(addr))
   }
 
   public async insertCheckpoint(
@@ -19,7 +16,10 @@ export default class CheckpointManager {
     checkpoint: Checkpoint
   ) {
     const bucket = await this.getBucket(depositContractAddress)
-    await bucket.put(checkpointId, Coder.encode(checkpoint.toStruct()))
+    await bucket.put(
+      checkpointId,
+      ovmContext.coder.encode(checkpoint.toStruct())
+    )
   }
 
   public async getCheckpoint(
@@ -30,7 +30,7 @@ export default class CheckpointManager {
     const res = await bucket.get(checkpointId)
     if (!res) return null
 
-    return DecoderUtil.decodeStructable(Checkpoint, Coder, res)
+    return decodeStructable(Checkpoint, ovmContext.coder, res)
   }
 
   public async removeCheckpoint(

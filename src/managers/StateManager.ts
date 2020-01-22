@@ -1,12 +1,11 @@
-import { types, db, StateUpdate } from 'wakkanay-ethereum-plasma'
-import Address = types.Address
-import Bytes = types.Bytes
-import BigNumber = types.BigNumber
-import Range = types.Range
-import KeyValueStore = db.KeyValueStore
-import RangeDb = db.RangeDb
-
-import Coder from '../Coder'
+import { StateUpdate } from '@cryptoeconomicslab/plasma'
+import {
+  Address,
+  Bytes,
+  BigNumber,
+  Range
+} from '@cryptoeconomicslab/primitives'
+import { KeyValueStore, RangeDb } from '@cryptoeconomicslab/db'
 
 enum Kind {
   Verified = 'Verified',
@@ -57,7 +56,7 @@ export default class StateManager {
     await db.put(
       range.start.data,
       range.end.data,
-      Coder.encode(record.toStruct())
+      ovmContext.coder.encode(record.toStruct())
     )
   }
 

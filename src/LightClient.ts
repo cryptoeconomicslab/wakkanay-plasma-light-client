@@ -1,37 +1,38 @@
 import {
-  ovm,
-  types,
-  db,
-  contract,
-  wallet,
-  utils,
-  ethContract,
   StateUpdate,
   Transaction,
   TransactionReceipt,
-  Checkpoint,
-  ethWallet,
-  verifiers
-} from 'wakkanay-ethereum-plasma'
-import Property = ovm.Property
-import FreeVariable = ovm.FreeVariable
-import Address = types.Address
-import Bytes = types.Bytes
-import BigNumber = types.BigNumber
-import Integer = types.Integer
-import Range = types.Range
-import KeyValueStore = db.KeyValueStore
-import ICommitmentContract = contract.ICommitmentContract
-import IDepositContract = contract.IDepositContract
-import IERC20Contract = contract.IERC20Contract
-import PETHContract = ethContract.PETHContract
-import DepositContract = ethContract.DepositContract
-import IWallet = wallet.IWallet
-import DecoderUtil = utils.DecoderUtil
-import EthWallet = ethWallet.EthWallet
-import DoubleLayerInclusionProof = verifiers.DoubleLayerInclusionProof
+  Checkpoint
+} from '@cryptoeconomicslab/plasma'
+import {
+  Property,
+  CompiledPredicate,
+  DeciderManager
+} from '@cryptoeconomicslab/ovm'
+import {
+  Address,
+  Bytes,
+  BigNumber,
+  Integer,
+  Range
+} from '@cryptoeconomicslab/primitives'
+import { KeyValueStore } from '@cryptoeconomicslab/db'
+import {
+  ICommitmentContract,
+  IDepositContract,
+  IERC20Contract
+} from '@cryptoeconomicslab/contract'
+import { PETHContract, DepositContract } from '@cryptoeconomicslab/eth-contract'
+import { Wallet } from '@cryptoeconomicslab/wallet'
+import { decodeStructable } from '@cryptoeconomicslab/coder'
+import { EthWallet } from '@cryptoeconomicslab/eth-wallet'
+import {
+  DoubleLayerInclusionProof,
+  DoubleLayerTreeVerifier,
+  DoubleLayerTreeLeaf
+} from '@cryptoeconomicslab/merkle-tree'
+import { Keccak256 } from '@cryptoeconomicslab/hash'
 
-import Coder from './Coder'
 import axios from 'axios'
 import EventEmitter from 'event-emitter'
 import { StateManager, SyncManager, CheckpointManager } from './managers'
@@ -40,10 +41,6 @@ const DEPOSIT_CONTRACT_ADDRESS = Address.from(
   process.env.DEPOSIT_CONTRACT_ADDRESS as string
 )
 const ETH_ADDRESS = Address.from(process.env.ETH_ADDRESS as string)
-const THERE_EXISTS_ADDRESS = Address.from(process.env.THERE_EXISTS_ADDRESS)
-const IS_VALID_SIGNATURE_ADDRESS = Address.from(
-  process.env.IS_VALID_SIG_ADDRESS
-)
 
 enum EmitterEvent {
   CHECKPOINT_FINALIZED = 'CHECKPOINT_FINALIZED',
@@ -57,10 +54,10 @@ export default class LightClient {
   private tokenContracts: Map<string, IERC20Contract> = new Map()
   private _syncing = false
   private ee = EventEmitter()
-  private ownershipPredicate: ovm.CompiledPredicate
+  private ownershipPredicate: CompiledPredicate
 
   constructor(
-    private wallet: IWallet,
+    private wallet: Wallet,
     private kvs: KeyValueStore,
     private depositContractFactory: (address: Address) => DepositContract,
     private tokenContractFactory: (address: Address) => IERC20Contract,
@@ -68,7 +65,7 @@ export default class LightClient {
     private stateManager: StateManager,
     private syncManager: SyncManager,
     private checkpointManager: CheckpointManager,
-    readonly deciderManager: ovm.DeciderManager
+    readonly deciderManager: DeciderManager
   ) {
     const ownershipPredicate = this.deciderManager.compiledPredicateMap.get(
       'Ownership'
@@ -170,15 +167,10 @@ export default class LightClient {
       const res = await axios.get(
         `${process.env.AGGREGATOR_HOST}/sync_state?address=${this.address}&blockNumber=${blockNumber.data}`
       )
-      const stateUpdates: StateUpdate[] = res.data.map(
-        (s: string) =>
-          new StateUpdate(
-            DecoderUtil.decodeStructable(
-              Property,
-              Coder,
-              Bytes.fromHexString(s)
-            )
-          )
+      const stateUpdates: StateUpdate[] = res.data.map((s: string) =>
+        StateUpdate.fromProperty(
+          decodeStructable(Property, ovmContext.coder, Bytes.fromHexString(s))
+        )
       )
       const promises = stateUpdates.map(async su => {
         // TODO: insert into unverified state update.
@@ -206,7 +198,7 @@ export default class LightClient {
         Address.from(addr),
         new Range(BigNumber.from(0), BigNumber.from(BigInt(10000)))
       )
-      const verifier = new verifiers.DoubleLayerTreeVerifier()
+      const verifier = new DoubleLayerTreeVerifier()
       const root = await this.syncManager.getRoot(blockNumber)
       if (!root) {
         return
@@ -219,22 +211,22 @@ export default class LightClient {
         const res = await axios.get(
           `${
             process.env.AGGREGATOR_HOST
-          }/inclusion_proof?blockNumber=${su.blockNumber.toString()}&stateUpdate=${Coder.encode(
-            su.property.toStruct()
-          ).toHexString()}`
+          }/inclusion_proof?blockNumber=${su.blockNumber.toString()}&stateUpdate=${ovmContext.coder
+            .encode(su.property.toStruct())
+            .toHexString()}`
         )
         if (res.status === 404) {
           return
         }
-        const inclusionProof = DecoderUtil.decodeStructable(
+        const inclusionProof = decodeStructable(
           DoubleLayerInclusionProof,
-          Coder,
+          ovmContext.coder,
           Bytes.fromHexString(res.data.data)
         )
-        const leaf = new verifiers.DoubleLayerTreeLeaf(
+        const leaf = new DoubleLayerTreeLeaf(
           su.depositContractAddress,
           su.range.start,
-          verifiers.Keccak256.hash(Coder.encode(su.property.toStruct()))
+          Keccak256.hash(ovmContext.coder.encode(su.property.toStruct()))
         )
         if (verifier.verifyInclusion(leaf, su.range, root, inclusionProof)) {
           console.info(
@@ -327,18 +319,18 @@ export default class LightClient {
 
     // TODO: specify transaction address
     const sig = await this.wallet.signMessage(
-      Coder.encode(tx.toProperty(Address.default()).toStruct())
+      ovmContext.coder.encode(tx.toProperty(Address.default()).toStruct())
     )
     tx.signature = sig
 
     const res = await axios.post(`${process.env.AGGREGATOR_HOST}/send_tx`, {
-      data: Coder.encode(tx.toStruct()).toHexString()
+      data: ovmContext.coder.encode(tx.toStruct()).toHexString()
     })
 
     if (res.data) {
-      const receipt = DecoderUtil.decodeStructable(
+      const receipt = decodeStructable(
         TransactionReceipt,
-        Coder,
+        ovmContext.coder,
         Bytes.fromHexString(res.data)
       )
       console.log(receipt)
@@ -400,7 +392,7 @@ export default class LightClient {
           c
         )
 
-        const stateUpdate = new StateUpdate(checkpoint[1])
+        const stateUpdate = StateUpdate.fromProperty(checkpoint[1])
         const owner = this.getOwner(stateUpdate)
         if (owner && owner.data === this.wallet.getAddress().data) {
           await this.stateManager.insertVerifiedStateUpdate(
@@ -444,7 +436,7 @@ export default class LightClient {
           c
         )
 
-        const stateUpdate = new StateUpdate(checkpoint[1])
+        const stateUpdate = StateUpdate.fromProperty(checkpoint[1])
         const owner = this.getOwner(stateUpdate)
         if (owner && owner.data === this.wallet.getAddress().data) {
           await this.stateManager.insertVerifiedStateUpdate(
