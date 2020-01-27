@@ -14,10 +14,15 @@ const APIClient = {
         .encode(su.property.toStruct())
         .toHexString()}`
     ),
-  sendTransaction: (tx: Transaction) =>
-    axios.post(`${API_HOST}/send_tx`, {
-      data: ovmContext.coder.encode(tx.toStruct()).toHexString()
+  sendTransaction: (tx: Transaction[] | Transaction) => {
+    const data = Array.isArray(tx)
+      ? tx.map(x => ovmContext.coder.encode(x.toStruct()).toHexString())
+      : ovmContext.coder.encode(tx.toStruct()).toHexString()
+
+    return axios.post(`${API_HOST}/send_tx`, {
+      data
     })
+  }
 }
 
 export default APIClient

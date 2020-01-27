@@ -39,7 +39,7 @@ describe('StateManager', () => {
     stateManager = new StateManager(db)
   })
 
-  test('resolve state update', async () => {
+  test('resolve state update with single state update', async () => {
     await stateManager.insertVerifiedStateUpdate(
       Address.default(),
       su(BigInt(0), BigInt(10))
@@ -50,13 +50,10 @@ describe('StateManager', () => {
     )
 
     const s = await stateManager.resolveStateUpdate(Address.default(), 5)
-    if (!s) throw new Error('S is null')
-
-    expect(s).not.toBeNull()
-    expect(s.amount).toBe(BigInt(5))
+    expect(s).toEqual([su(BigInt(0), BigInt(5))])
   })
 
-  test('resolve state update to null', async () => {
+  test('resolve state update with multiple state updates', async () => {
     await stateManager.insertVerifiedStateUpdate(
       Address.default(),
       su(BigInt(0), BigInt(10))
@@ -66,7 +63,32 @@ describe('StateManager', () => {
       su(BigInt(10), BigInt(20))
     )
 
-    const s = await stateManager.resolveStateUpdate(Address.default(), 15)
-    expect(s).toBeNull()
+    const resolvedStateUpdates = await stateManager.resolveStateUpdate(
+      Address.default(),
+      15
+    )
+
+    if (!resolvedStateUpdates) throw new Error('resolvedStateUpdates is null')
+    expect(resolvedStateUpdates).toEqual([
+      su(BigInt(0), BigInt(10)),
+      su(BigInt(10), BigInt(15))
+    ])
+  })
+
+  test('resolve state update to be null', async () => {
+    await stateManager.insertVerifiedStateUpdate(
+      Address.default(),
+      su(BigInt(0), BigInt(10))
+    )
+    await stateManager.insertVerifiedStateUpdate(
+      Address.default(),
+      su(BigInt(10), BigInt(20))
+    )
+
+    const resolvedStateUpdates = await stateManager.resolveStateUpdate(
+      Address.default(),
+      25
+    )
+    expect(resolvedStateUpdates).toBeNull()
   })
 })
