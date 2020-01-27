@@ -177,9 +177,7 @@ export default class StateManager {
   }
 
   /**
-   * returns a state update if there exists a state update whose range is more than given amount
-   *
-   * FIXME: Needs to be fixed to following logic
+   * ResolveStateUpdate
    * resolve state updates with given amount.
    * returns state updates whose range would be summed up to exact amount of second arg.
    * resolving logic is following
@@ -194,21 +192,37 @@ export default class StateManager {
   public async resolveStateUpdate(
     depositContractAddress: Address,
     amount: number
-  ): Promise<StateUpdate | null> {
+  ): Promise<StateUpdate[] | null> {
     const db = await this.getRangeDb(Kind.Verified, depositContractAddress)
-    const stateUpdates = await db.get(BigInt(0), BigInt(10000))
-    const su = stateUpdates
-      .map(StateUpdate.fromRangeRecord)
-      .find(su => su.amount >= BigInt(amount))
-    if (!su) return null
+    const stateUpdates = []
+    const iter = db.iter(BigInt(0))
 
-    su.update({
-      range: new Range(
-        su.range.start,
-        BigNumber.from(su.range.start.data + BigInt(amount))
-      )
-    })
+    let next = await iter.next()
+    let sum = BigInt(0)
+    while (next !== null) {
+      const su = StateUpdate.fromRangeRecord(next)
+      if (sum + su.amount > amount) {
+        su.update({
+          range: new Range(
+            su.range.start,
+            BigNumber.from(
+              su.range.start.data + (sum + su.amount - BigInt(amount))
+            )
+          )
+        })
+        stateUpdates.push(su)
+        return stateUpdates
+      }
 
-    return su
+      stateUpdates.push(su)
+      sum += su.amount
+      next = await iter.next()
+    }
+
+    if (sum < amount) {
+      return null
+    }
+
+    return stateUpdates
   }
 }

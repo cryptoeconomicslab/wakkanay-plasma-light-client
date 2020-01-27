@@ -291,36 +291,34 @@ export default class LightClient {
     to: Address
   ) {
     console.log('transfer :', amount, depositContractAddress, to)
-    const su = await this.stateManager.resolveStateUpdate(
+    const stateUpdates = await this.stateManager.resolveStateUpdate(
       depositContractAddress,
       amount
     )
-    if (!su) {
+    if (stateUpdates === null) {
       throw new Error('Not enough amount')
     }
-    su.update({
-      range: new Range(
-        su.range.start,
-        BigNumber.from(su.range.start.data + BigInt(amount))
-      )
-    })
 
     const property = this.ownershipProperty(to)
-    const tx = new Transaction(
-      depositContractAddress,
-      su.range,
-      su.blockNumber,
-      property,
-      this.wallet.getAddress()
+    const latestBlock = await this.syncManager.getLatestSyncedBlockNumber()
+    const transactions = await Promise.all(
+      stateUpdates.map(async su => {
+        const tx = new Transaction(
+          depositContractAddress,
+          su.range,
+          BigNumber.from(latestBlock.data + BigInt(5)),
+          property,
+          this.wallet.getAddress()
+        )
+        const sig = await this.wallet.signMessage(
+          ovmContext.coder.encode(tx.toProperty(Address.default()).toStruct())
+        )
+        tx.signature = sig
+        return tx
+      })
     )
 
-    // TODO: specify transaction address
-    const sig = await this.wallet.signMessage(
-      ovmContext.coder.encode(tx.toProperty(Address.default()).toStruct())
-    )
-    tx.signature = sig
-
-    const res = await APIClient.sendTransaction(tx)
+    const res = await APIClient.sendTransaction(transactions)
 
     if (res.data) {
       const receipt = decodeStructable(
@@ -328,16 +326,20 @@ export default class LightClient {
         ovmContext.coder,
         Bytes.fromHexString(res.data)
       )
-      console.log(receipt)
+
+      console.log('Tx receipt: ', receipt)
+
       if (receipt.status.data === 1) {
-        await this.stateManager.removeVerifiedStateUpdate(
-          su.depositContractAddress,
-          su.range
-        )
-        await this.stateManager.insertPendingStateUpdate(
-          su.depositContractAddress,
-          su
-        )
+        for await (const su of stateUpdates) {
+          await this.stateManager.removeVerifiedStateUpdate(
+            su.depositContractAddress,
+            su.range
+          )
+          await this.stateManager.insertPendingStateUpdate(
+            su.depositContractAddress,
+            su
+          )
+        }
       } else {
         throw new Error('Invalid transaction')
       }
@@ -449,6 +451,10 @@ export default class LightClient {
   }
 
   public async exit(amount: number, depositContractAddress: Address) {
+    const stateUpdate = await this.stateManager.resolveStateUpdate(
+      depositContractAddress,
+      amount
+    )
     // TODO: implement
   }
 
