@@ -319,28 +319,31 @@ export default class LightClient {
 
     const res = await APIClient.sendTransaction(transactions)
 
-    if (res.data) {
-      const receipt = decodeStructable(
-        TransactionReceipt,
-        ovmContext.coder,
-        Bytes.fromHexString(res.data)
-      )
+    if (Array.isArray(res.data)) {
+      const receipts = res.data.map(d => {
+        return decodeStructable(
+          TransactionReceipt,
+          ovmContext.coder,
+          Bytes.fromHexString(d)
+        )
+      })
 
-      console.log('Tx receipt: ', receipt)
-
-      if (receipt.status.data === 1) {
-        for await (const su of stateUpdates) {
-          await this.stateManager.removeVerifiedStateUpdate(
-            su.depositContractAddress,
-            su.range
-          )
-          await this.stateManager.insertPendingStateUpdate(
-            su.depositContractAddress,
-            su
-          )
+      // TODO: is this valid handling?
+      for await (const receipt of receipts) {
+        if (receipt.status.data === 1) {
+          for await (const su of stateUpdates) {
+            await this.stateManager.removeVerifiedStateUpdate(
+              su.depositContractAddress,
+              su.range
+            )
+            await this.stateManager.insertPendingStateUpdate(
+              su.depositContractAddress,
+              su
+            )
+          }
+        } else {
+          throw new Error('Invalid transaction')
         }
-      } else {
-        throw new Error('Invalid transaction')
       }
     }
   }
