@@ -37,7 +37,6 @@ import { Keccak256 } from '@cryptoeconomicslab/hash'
 import EventEmitter from 'event-emitter'
 import { StateManager, SyncManager, CheckpointManager } from './managers'
 import APIClient from './APIClient'
-import * as Config from './config/config.local.json'
 
 const DEPOSIT_CONTRACT_ADDRESS = Address.from(
   process.env.DEPOSIT_CONTRACT_ADDRESS as string
@@ -68,10 +67,10 @@ export default class LightClient {
     private stateManager: StateManager,
     private syncManager: SyncManager,
     private checkpointManager: CheckpointManager,
-    config?: InitilizationConfig
+    config: InitilizationConfig
   ) {
     this.deciderManager = new DeciderManager(witnessDb, ovmContext.coder)
-    this.deciderManager.loadJson(config || Config)
+    this.deciderManager.loadJson(config)
     const ownershipPredicate = this.deciderManager.compiledPredicateMap.get(
       'Ownership'
     )
