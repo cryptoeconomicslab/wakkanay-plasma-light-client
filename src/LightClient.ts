@@ -21,7 +21,8 @@ import { KeyValueStore } from '@cryptoeconomicslab/db'
 import {
   ICommitmentContract,
   IDepositContract,
-  IERC20Contract
+  IERC20Contract,
+  IAdjudicationContract
 } from '@cryptoeconomicslab/contract'
 import { PETHContract, DepositContract } from '@cryptoeconomicslab/eth-contract'
 import { Wallet } from '@cryptoeconomicslab/wallet'
@@ -61,6 +62,7 @@ export default class LightClient {
   constructor(
     private wallet: Wallet,
     private witnessDb: KeyValueStore,
+    private adjudicationContract: IAdjudicationContract,
     private depositContractFactory: (address: Address) => DepositContract,
     private tokenContractFactory: (address: Address) => IERC20Contract,
     private commitmentContract: ICommitmentContract,
@@ -231,6 +233,14 @@ export default class LightClient {
           await this.stateManager.removePendingStateUpdate(
             su.depositContractAddress,
             su.range
+          )
+
+          // store inclusionProof as witness
+          await (
+            await this.witnessDb.bucket(Bytes.fromString('inclusion_proof'))
+          ).put(
+            Bytes.fromString('TODO: use su range as a key'),
+            Bytes.fromHexString(res.data.data)
           )
           this.ee.emit(EmitterEvent.TRANSFER_COMPLETE, su)
         }
@@ -453,21 +463,49 @@ export default class LightClient {
   }
 
   public async exit(amount: number, depositContractAddress: Address) {
-    const stateUpdate = await this.stateManager.resolveStateUpdate(
+    const stateUpdates = await this.stateManager.resolveStateUpdate(
       depositContractAddress,
       amount
     )
-    // TODO: implement
+    if (Array.isArray(stateUpdates) && stateUpdates.length > 0) {
+      const predicate = this.deciderManager.compiledPredicateMap.get('Exit')
+      if (!predicate) throw new Error('Exit predicate not found')
+      const coder = ovmContext.coder
+      await Promise.all(
+        stateUpdates.map(async stateUpdate => {
+          const proof = await (
+            await this.witnessDb.bucket(Bytes.fromString('inclusion_proof'))
+          ).get(Bytes.fromString('TODO: use su range as a key'))
+          if (!proof)
+            throw new Error('No inclusion proof for state update is found')
+
+          const exitProperty = predicate.makeProperty([
+            coder.encode(stateUpdate.property.toStruct()),
+            proof
+          ])
+          const exitId = Keccak256.hash(coder.encode(exitProperty.toStruct()))
+          await this.adjudicationContract.claimProperty(exitProperty)
+          await (await this.witnessDb.bucket(Bytes.fromString('Exit'))).put(
+            exitId,
+            coder.encode(exitProperty.toStruct())
+          )
+        })
+      )
+    }
   }
 
   public async finalizeExit(exitId: Bytes) {
     // TODO: implement
+    // get exit lists
+    // if a exit with given id is finalizable,
+    // call finalize exit method on deposit contract.
 
-    // when complete
     {
       this.ee.emit(EmitterEvent.EXIT_FINALIZED, exitId)
     }
   }
+
+  // TODO: handling challenge game
 
   //
   // Events subscriptions
